@@ -37,28 +37,50 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Build projects and stage into dist/
+      - name: Determine changed projects
+        id: changed
+        run: |
+          set -euo pipefail
+          # Determine a base commit for the diff
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE=$(git rev-list --max-parents=1 HEAD)
+          fi
+          CHANGED=$(git diff --name-only "$BASE" HEAD | awk -F/ '/^projects\/[A-Za-z0-9_.-]+\// {print $2}' | sort -u | tr '\n' ' ')
+          echo "projects=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "Changed projects: $CHANGED"
+      - name: Build changed projects and stage into dist/
+        if: steps.changed.outputs.projects != ''
         run: |
           set -euo pipefail
           mkdir -p dist
-          for dir in projects/*; do
+          for proj in ${{ steps.changed.outputs.projects }}; do
+            dir="projects/$proj"
             if [ -f "$dir/package.json" ]; then
               echo "Building $dir"
               (cd "$dir" && bun install --silent && bun run build)
-              proj_name=$(basename "$dir")
-              mkdir -p "dist/$proj_name"
-              cp -R "$dir/dist/." "dist/$proj_name/"
+              mkdir -p "dist/$proj"
+              cp -R "$dir/dist/." "dist/$proj/"
+            else
+              echo "Skipping $dir (no package.json)"
             fi
           done
           echo "Staged projects:"
           ls -la dist
+      - name: Skip (no project changes)
+        if: steps.changed.outputs.projects == ''
+        run: echo "No changes under projects/*; skipping build and deploy."
       - name: Setup Pages
+        if: steps.changed.outputs.projects != ''
         uses: actions/configure-pages@v5
       - name: Upload artifact
+        if: steps.changed.outputs.projects != ''
         uses: actions/upload-pages-artifact@v3
         with:
           # Upload dist folder
           path: './dist'
       - name: Deploy to GitHub Pages
         id: deployment
+        if: steps.changed.outputs.projects != ''
         uses: actions/deploy-pages@v4
