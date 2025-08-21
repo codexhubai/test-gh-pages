@@ -31,6 +31,25 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Build projects and stage into dist/
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for dir in projects/*; do
+            if [ -f "$dir/package.json" ]; then
+              echo "Building $dir"
+              (cd "$dir" && bun install --silent && bun run build)
+              proj_name=$(basename "$dir")
+              mkdir -p "dist/$proj_name"
+              cp -R "$dir/dist/." "dist/$proj_name/"
+            fi
+          done
+          echo "Staged projects:"
+          ls -la dist
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
