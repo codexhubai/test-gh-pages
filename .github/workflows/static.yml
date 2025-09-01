@@ -39,40 +39,6 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      - name: Download current Pages artifact
-        if: steps.changed.outputs.projects != ''
-        run: |
-          set -euo pipefail
-          # Get the latest Pages artifact
-          ARTIFACTS=$(curl -s -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts" | \
-            jq -r '.artifacts[] | select(.name == "github-pages") | .id' | head -1)
-          
-          if [ -n "$ARTIFACTS" ]; then
-            echo "Found existing Pages artifact: $ARTIFACTS"
-            # Download the artifact
-            curl -L -H "Accept: application/vnd.github.v3+json" \
-              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$ARTIFACTS/zip" \
-              -o current-pages.zip
-            
-            if [ -f "current-pages.zip" ] && [ -s "current-pages.zip" ]; then
-              # Extract the artifact to dist directory
-              mkdir -p dist
-              unzip -q current-pages.zip -d dist/
-              rm current-pages.zip
-              echo "Downloaded and extracted existing Pages artifact"
-              echo "Current dist directory contents:"
-              ls -la dist
-            else
-              echo "Failed to download artifact, creating fresh dist directory"
-              mkdir -p dist
-            fi
-          else
-            echo "No existing Pages artifact found, will create fresh deployment"
-            mkdir -p dist
-          fi
       - name: Determine changed projects
         id: changed
         run: |

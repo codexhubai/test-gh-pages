@@ -26,7 +26,7 @@ export const Hero = () => {
                 transition={{ delay: 0.4, duration: 0.8 }}
                 className="inline-block px-4 py-2 bg-indigo-50 dark:bg-indigo-950/40 rounded-full mb-6"
               >
-                <span className="text-indigo-700 dark:text-indigo-300 font-medium">Funding Innovation. Building Futures.</span>
+                <span className="text-indigo-700 dark:text-indigo-300 font-medium">Funding Innovation 1. Building Futures.</span>
               </motion.div>
               
               <motion.h1 
