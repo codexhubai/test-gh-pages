@@ -51,7 +51,7 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`/projects/${projectName}`, '_blank')}
+              onClick={() => window.open(`${import.meta.env.VITE_GITHUB_PAGES_URL}/projects/${projectName}`, '_blank')}
               className="flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
