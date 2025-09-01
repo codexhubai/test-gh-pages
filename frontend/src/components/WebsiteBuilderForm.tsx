@@ -25,6 +25,7 @@ interface WebsiteBuilderFormProps {
     apiKey: string;
     projectName: string;
     taskId?: string;
+    taskStatus?: Task['status'];
   }) => void;
 }
 
@@ -173,6 +174,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
             apiKey: apiKey,
             projectName: projectName.trim(),
             taskId: response.task.metadata?.codexTaskId,
+            taskStatus: 'pending',
           });
         }
       } else {

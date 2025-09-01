@@ -9,11 +9,25 @@ const Home = () => {
     message: string;
     apiKey: string;
     projectName: string;
+    taskId?: string;
+    taskStatus?: string;
   }) => {
     console.log("Form submitted:", data);
     
     // Store API key in localStorage for the chat interface
     localStorage.setItem('codexhub_api_key', data.apiKey);
+    
+    // Store task information in localStorage for the chat interface
+    if (data.taskId) {
+      const taskData = {
+        id: data.taskId,
+        task: data.message,
+        status: data.taskStatus || 'pending',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(`codexhub_task_${data.projectName}`, JSON.stringify(taskData));
+    }
     
     // Navigate to chat interface
     navigate(`/projects/${data.projectName}`);

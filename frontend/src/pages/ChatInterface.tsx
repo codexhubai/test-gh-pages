@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -93,31 +93,27 @@ const TaskCard = ({ task, onRemove }: { task: ActiveTask; onRemove: (taskId: str
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="mb-3"
+      className="mb-1"
     >
-      <Card className={`p-2 border ${getStatusColor()}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {getStatusIcon()}
-            <Badge variant="outline" className="text-xs">
-              {getStatusText()}
-            </Badge>
-            <span className="text-xs text-gray-600 truncate" title={task.task}>
-              {task.task}
-            </span>
-          </div>
+      <div className={`p-1.5 border rounded-md ${getStatusColor()} w-full overflow-hidden`}>
+        <div className="flex items-center gap-1">
+          {getStatusIcon()}
+          <Badge variant="outline" className="text-xs px-1.5 py-0.5 flex-shrink-0">
+            {getStatusText()}
+          </Badge>
+          <span className="text-xs text-gray-600 truncate flex-1" title={task.task}>
+            {task.task}
+          </span>
           {(task.status === 'completed' || task.status === 'failed') && (
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
               onClick={() => onRemove(task.id)}
-              className="h-5 w-5 p-0 opacity-50 hover:opacity-100 ml-2"
+              className="h-3 w-3 p-0 opacity-50 hover:opacity-100 flex-shrink-0 text-xs leading-none"
             >
               ×
-            </Button>
+            </button>
           )}
         </div>
-      </Card>
+      </div>
     </motion.div>
   );
 };
@@ -134,6 +130,8 @@ const ChatInterface = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingAttemptsRef = useRef<number>(0);
+  const maxPollingAttempts = 20; // Maximum polling attempts before stopping
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -143,76 +141,105 @@ const ChatInterface = () => {
     scrollToBottom();
   }, [messages]);
 
-  // Task polling effect
-  useEffect(() => {
-    if (activeTasks.length > 0 && apiKey) {
-      const pollTasks = async () => {
-        const tasksToPoll = activeTasks.filter(task => 
-          task.status === 'pending' || task.status === 'in_progress'
-        );
-        
-        if (tasksToPoll.length === 0) {
-          // No active tasks to poll, clear interval
-          if (pollingIntervalRef.current) {
-            clearInterval(pollingIntervalRef.current);
-            pollingIntervalRef.current = null;
-          }
-          return;
-        }
+  // Memoize tasks that need polling to prevent unnecessary re-renders
+  const tasksToPoll = useMemo(() => {
+    return activeTasks.filter(task => 
+      task.status === 'pending' || task.status === 'in_progress'
+    );
+  }, [activeTasks]);
 
-        for (const activeTask of tasksToPoll) {
-          try {
-            const response = await taskService.getTaskById(activeTask.id, apiKey);
-            
-            if (response.success) {
-              const task = response.task;
+  // Memoize the polling function to prevent recreation on every render
+  const pollTasks = useCallback(async () => {
+    if (tasksToPoll.length === 0 || !apiKey) {
+      // No active tasks to poll, clear interval
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      pollingAttemptsRef.current = 0;
+      return;
+    }
+
+    // Increment polling attempts
+    pollingAttemptsRef.current += 1;
+
+    // Stop polling if we've exceeded max attempts
+    if (pollingAttemptsRef.current > maxPollingAttempts) {
+      console.warn('Max polling attempts reached, stopping polling');
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+      return;
+    }
+
+    // Batch API calls for better performance
+    const taskPromises = tasksToPoll.map(async (activeTask) => {
+      try {
+        const response = await taskService.getTaskById(activeTask.id, apiKey);
+        return { activeTask, response };
+      } catch (error) {
+        console.error('Error polling task:', error);
+        return { activeTask, response: null };
+      }
+    });
+
+    const results = await Promise.all(taskPromises);
+    
+    // Process results
+    for (const { activeTask, response } of results) {
+      if (response?.success) {
+        const task = response.task;
+        
+        // Update the task in our active tasks array
+        setActiveTasks(prev => prev.map(t => 
+          t.id === activeTask.id 
+            ? { ...t, status: task.status, updatedAt: new Date() }
+            : t
+        ));
+        
+        if (taskService.isTaskComplete(task.status)) {
+          // Update the bot message with the result
+          setMessages(prev => prev.map(msg => {
+            if (msg.taskId === activeTask.id) {
+              let resultMessage = "";
               
-              // Update the task in our active tasks array
-              setActiveTasks(prev => prev.map(t => 
-                t.id === activeTask.id 
-                  ? { ...t, status: task.status, updatedAt: new Date() }
-                  : t
-              ));
-              
-              if (taskService.isTaskComplete(task.status)) {
-                // Update the bot message with the result
-                setMessages(prev => prev.map(msg => {
-                  if (msg.taskId === activeTask.id) {
-                    let resultMessage = "";
-                    
-                    if (task.status === 'completed') {
-                      if (task.result?.message) {
-                        resultMessage = task.result.message;
-                      } else if (task.result?.task?.summary) {
-                        resultMessage = task.result.task.summary;
-                      } else {
-                        resultMessage = "Task completed successfully! Your changes have been applied.";
-                      }
-                    } else if (task.status === 'failed') {
-                      resultMessage = "Task failed. Please try again or contact support if the issue persists.";
-                    }
-                    
-                    return {
-                      ...msg,
-                      content: resultMessage
-                    };
-                  }
-                  return msg;
-                }));
-                
-                // Refresh the iframe to show updated website
-                if (iframeRef.current) {
-                  iframeRef.current.src = iframeRef.current.src;
+              if (task.status === 'completed') {
+                if (task.result?.message) {
+                  resultMessage = task.result.message;
+                } else if (task.result?.task?.summary) {
+                  resultMessage = task.result.task.summary;
+                } else {
+                  resultMessage = "Task completed successfully! Your changes have been applied.";
                 }
+              } else if (task.status === 'failed') {
+                resultMessage = "Task failed. Please try again or contact support if the issue persists.";
               }
-            } else {
-              console.error('Failed to fetch task status:', (response as any).message);
+              
+              return {
+                ...msg,
+                content: resultMessage
+              };
             }
-          } catch (error) {
-            console.error('Error polling task:', error);
+            return msg;
+          }));
+          
+          // Refresh the iframe to show updated website
+          if (iframeRef.current) {
+            iframeRef.current.src = iframeRef.current.src;
           }
         }
-      };
+      } else if (response) {
+        console.error('Failed to fetch task status:', (response as any).message);
+      }
+    }
+  }, [tasksToPoll, apiKey, maxPollingAttempts]);
+
+  // Optimized task polling effect with fixed 30-second interval
+  useEffect(() => {
+    if (tasksToPoll.length > 0 && apiKey) {
+      // Reset polling attempts when starting new polling
+      pollingAttemptsRef.current = 0;
       
       // Poll immediately, then every 30 seconds
       pollTasks();
@@ -225,17 +252,66 @@ const ChatInterface = () => {
         pollingIntervalRef.current = null;
       }
     };
-  }, [activeTasks, apiKey]);
+  }, [tasksToPoll, apiKey, pollTasks]);
 
-  // Initialize welcome message
+  // Initialize welcome message and check for existing tasks
   useEffect(() => {
     if (projectName && messages.length === 0) {
-      setMessages([{
-        id: '1',
-        content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
-        sender: 'bot',
-        timestamp: new Date()
-      }]);
+      // Check for existing task in localStorage
+      const existingTaskData = localStorage.getItem(`codexhub_task_${projectName}`);
+      
+      if (existingTaskData) {
+        try {
+          const taskData = JSON.parse(existingTaskData);
+          const activeTask: ActiveTask = {
+            id: taskData.id,
+            task: taskData.task,
+            status: taskData.status,
+            createdAt: new Date(taskData.createdAt),
+            updatedAt: new Date(taskData.updatedAt)
+          };
+          
+          // Add the existing task to active tasks
+          setActiveTasks([activeTask]);
+          
+          // Add a message about the existing task
+          setMessages([
+            {
+              id: '1',
+              content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
+              sender: 'bot',
+              timestamp: new Date()
+            },
+            {
+              id: '2',
+              content: "I've started processing your request. This may take several minutes, grab a coffee (10 mins Approx)...",
+              sender: 'bot',
+              timestamp: new Date(taskData.createdAt),
+              taskId: taskData.id
+            }
+          ]);
+          
+          // Clean up the localStorage entry
+          localStorage.removeItem(`codexhub_task_${projectName}`);
+        } catch (error) {
+          console.error('Error parsing existing task data:', error);
+          // Fallback to normal welcome message
+          setMessages([{
+            id: '1',
+            content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
+            sender: 'bot',
+            timestamp: new Date()
+          }]);
+        }
+      } else {
+        // No existing task, show normal welcome message
+        setMessages([{
+          id: '1',
+          content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
+          sender: 'bot',
+          timestamp: new Date()
+        }]);
+      }
     }
   }, [projectName, messages.length]);
 
@@ -245,6 +321,17 @@ const ChatInterface = () => {
       navigate('/');
     }
   }, [projectName, navigate]);
+
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      // Clear any pending timeouts/intervals when component unmounts
+      if (pollingIntervalRef.current) {
+        clearTimeout(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleSendMessage = async () => {
     const hasActiveTasks = activeTasks.some(task => 
@@ -458,7 +545,7 @@ const ChatInterface = () => {
                   
                   {/* Show task card inline after bot message if there's an associated task */}
                   {message.sender === 'bot' && associatedTask && (
-                    <div className="ml-11 mt-2">
+                    <div className="ml-11 mt-1 w-[calc(100%-2.75rem)]">
                       <TaskCard
                         task={associatedTask}
                         onRemove={removeTask}
