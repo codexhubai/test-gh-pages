@@ -1,5 +1,5 @@
-# Simple workflow for deploying static content to GitHub Pages
-name: Deploy static content to Pages
+# Enhanced workflow for deploying static content to GitHub Pages with release management
+name: Deploy static content to Pages with Release Management
 
 on:
   # Runs on pushes targeting the default branch
@@ -11,11 +11,12 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages and release management
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
+  actions: read
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 # However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
@@ -24,8 +25,83 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Single deploy job since we're just deploying
+  # Download latest release artifacts
+  download-artifacts:
+    runs-on: ubuntu-latest
+    outputs:
+      has-artifacts: ${{ steps.check-artifacts.outputs.has-artifacts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get latest release
+        id: latest-release
+        run: |
+          # Get the latest release
+          LATEST_RELEASE=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
+          if [ -n "$LATEST_RELEASE" ]; then
+            echo "tag_name=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+            echo "Found latest release: $LATEST_RELEASE"
+          else
+            echo "No releases found"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check if artifacts exist
+        id: check-artifacts
+        run: |
+          if [ -n "${{ steps.latest-release.outputs.tag_name }}" ]; then
+            # Check if the release has dist artifacts
+            ARTIFACTS=$(gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("dist")) | .name' 2>/dev/null || echo "")
+            if [ -n "$ARTIFACTS" ]; then
+              echo "has-artifacts=true" >> $GITHUB_OUTPUT
+              echo "Found dist artifacts in latest release"
+            else
+              echo "has-artifacts=false" >> $GITHUB_OUTPUT
+              echo "No dist artifacts found in latest release"
+            fi
+          else
+            echo "has-artifacts=false" >> $GITHUB_OUTPUT
+            echo "No releases found"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download latest dist artifacts
+        if: steps.check-artifacts.outputs.has-artifacts == 'true'
+        run: |
+          # Create dist directory
+          mkdir -p dist
+          
+          # Download all dist-related assets from the latest release
+          gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("dist")) | .browser_download_url' | while read url; do
+            if [ -n "$url" ]; then
+              echo "Downloading: $url"
+              wget -q "$url" -O temp_artifact.zip
+              unzip -q temp_artifact.zip -d dist/
+              rm temp_artifact.zip
+            fi
+          done
+          
+          echo "Downloaded artifacts to dist directory:"
+          ls -la dist/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload dist artifacts for next job
+        if: steps.check-artifacts.outputs.has-artifacts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+          retention-days: 1
+
+  # Build and deploy job
   deploy:
+    needs: download-artifacts
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -56,6 +132,13 @@ jobs:
           CHANGED=$(git diff --name-only "$BASE" HEAD | awk -F/ '/^projects\/[A-Za-z0-9_.-]+\// {print $2}' | sort -u | tr '\n' ' ')
           echo "projects=$CHANGED" >> "$GITHUB_OUTPUT"
           echo "Changed projects: $CHANGED"
+      - name: Download existing dist artifacts
+        if: needs.download-artifacts.outputs.has-artifacts == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist/
+      
       - name: Build changed projects and merge into dist/
         if: steps.changed.outputs.projects != ''
         run: |
@@ -92,3 +175,40 @@ jobs:
         id: deployment
         if: steps.changed.outputs.projects != ''
         uses: actions/deploy-pages@v4
+      
+      - name: Create release tag and upload artifacts
+        if: steps.changed.outputs.projects != ''
+        run: |
+          set -euo pipefail
+          
+          # Generate version tag based on timestamp and commit hash
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          VERSION_TAG="v${TIMESTAMP}-${COMMIT_HASH}"
+          
+          echo "Creating release tag: $VERSION_TAG"
+          
+          # Create and push the tag
+          git tag -a "$VERSION_TAG" -m "Release $VERSION_TAG - Deployed projects: ${{ steps.changed.outputs.projects }}"
+          git push origin "$VERSION_TAG"
+          
+          # Wait a moment for the tag to be available
+          sleep 5
+          
+          # Create release with the tag
+          gh release create "$VERSION_TAG" \
+            --title "Release $VERSION_TAG" \
+            --notes "Automated release containing built projects: ${{ steps.changed.outputs.projects }}" \
+            --generate-notes
+          
+          # Create a zip file of the dist directory
+          cd dist
+          zip -r "../dist-artifacts.zip" .
+          cd ..
+          
+          # Upload the dist artifacts to the release
+          gh release upload "$VERSION_TAG" dist-artifacts.zip --clobber
+          
+          echo "Successfully created release $VERSION_TAG with dist artifacts"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
