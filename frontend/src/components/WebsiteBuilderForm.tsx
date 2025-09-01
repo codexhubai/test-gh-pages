@@ -8,9 +8,12 @@ import { Label } from "@/components/ui/label";
 import { 
   Send,
   Key,
-  FolderOpen
+  FolderOpen,
+  AlertCircle
 } from "lucide-react";
 import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
+import { useApiKey } from "@/contexts/ApiKeyContext";
+import ApiKeyDialog from "@/components/ApiKeyDialog";
 
 interface WebsiteBuilderFormProps {
   onSubmit?: (data: {
@@ -21,8 +24,8 @@ interface WebsiteBuilderFormProps {
 }
 
 const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
+  const { apiKey, isApiKeySet } = useApiKey();
   const [message, setMessage] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [projectName, setProjectName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [projectNameError, setProjectNameError] = useState("");
@@ -53,7 +56,12 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !apiKey.trim() || !projectName.trim()) {
+    if (!message.trim() || !projectName.trim()) {
+      return;
+    }
+
+    // Check if API key is set
+    if (!isApiKeySet) {
       return;
     }
 
@@ -70,7 +78,10 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
       // Prepare the request for the agent
       const agentRequest: RunAgentRequest = {
         repoUrl: repoUrl,
-        prompt: message.trim(),
+        prompt: `
+        I want to work in ${projectName.trim()} folder.
+        Here is my request:
+        ${message.trim()}`,
         branchName: null,
         autoMerge: true,
         attachments: []
@@ -78,7 +89,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
 
       // Call the RunAgent method
       const response: RunAgentResponse = await agentService.runAgent(
-        apiKey.trim(),
+        apiKey,
         agentRequest
       );
 
@@ -88,7 +99,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
       if (onSubmit) {
         await onSubmit({
           message: message.trim(),
-          apiKey: apiKey.trim(),
+          apiKey: apiKey,
           projectName: projectName.trim(),
         });
       }
@@ -102,7 +113,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
     }
   };
 
-  const canSubmit = message.trim() && apiKey.trim() && projectName.trim() && !projectNameError;
+  const canSubmit = message.trim() && isApiKeySet && projectName.trim() && !projectNameError;
 
   return (
     <motion.div
@@ -135,22 +146,34 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* API Key and Project Name */}
+            {/* API Key Status and Project Name */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="apiKey" className="text-sm font-medium text-gray-700">
+                <Label className="text-sm font-medium text-gray-700">
                   <Key className="w-4 h-4 inline mr-2" />
                   CodexHub API Key
                 </Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder="Enter your CodexHub API key"
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  className="h-12 border-2 border-gray-200 focus:border-purple-500 transition-colors"
-                  required
-                />
+                <div className="h-12 flex items-center justify-between p-3 border-2 border-gray-200 rounded-md bg-gray-50">
+                  <div className="flex items-center gap-2">
+                    {isApiKeySet ? (
+                      <>
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <span className="text-sm text-green-700 font-medium">API Key Set</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="w-4 h-4 text-amber-500" />
+                        <span className="text-sm text-amber-700">API Key Required</span>
+                      </>
+                    )}
+                  </div>
+                  <ApiKeyDialog />
+                </div>
+                {!isApiKeySet && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    Please set your API key to continue
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="projectName" className="text-sm font-medium text-gray-700">

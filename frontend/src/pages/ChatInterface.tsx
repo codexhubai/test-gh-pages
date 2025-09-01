@@ -11,9 +11,12 @@ import {
   User,
   RefreshCw,
   ExternalLink,
-  ArrowLeft
+  ArrowLeft,
+  AlertCircle
 } from "lucide-react";
 import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
+import { useApiKey } from "@/contexts/ApiKeyContext";
+import ApiKeyDialog from "@/components/ApiKeyDialog";
 
 interface Message {
   id: string;
@@ -25,11 +28,8 @@ interface Message {
 const ChatInterface = () => {
   const { projectName } = useParams<{ projectName: string }>();
   const navigate = useNavigate();
+  const { apiKey, isApiKeySet } = useApiKey();
   
-  // Get API key from localStorage (stored when form was submitted)
-  const [apiKey, setApiKey] = useState(() => {
-    return localStorage.getItem('codexhub_api_key') || '';
-  });
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +65,18 @@ const ChatInterface = () => {
 
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isLoading) return;
+
+    // Check if API key is set
+    if (!isApiKeySet) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: "Please set your API key first to use the chat feature. Click the 'Set API Key' button in the header.",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -168,18 +180,29 @@ const ChatInterface = () => {
               </div>
               <div>
                 <h1 className="text-lg font-semibold text-gray-800">CodexHub Chat</h1>
-                <p className="text-sm text-gray-500">Project: {projectName}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-gray-500">Project: {projectName}</p>
+                  {!isApiKeySet && (
+                    <div className="flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3 text-amber-500" />
+                      <span className="text-xs text-amber-600">API Key Required</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refreshWebsite}
-              className="flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              <ApiKeyDialog />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshWebsite}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
+            </div>
           </div>
         </div>
 
