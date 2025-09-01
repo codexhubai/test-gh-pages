@@ -25,10 +25,40 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
   const [apiKey, setApiKey] = useState("");
   const [projectName, setProjectName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [projectNameError, setProjectNameError] = useState("");
+
+  // Validate project name to be URL-friendly (lowercase, hyphens only)
+  const validateProjectName = (name: string): boolean => {
+    const urlFriendlyPattern = /^[a-z0-9-]+$/;
+    const isValid = urlFriendlyPattern.test(name) && name.length > 0;
+    
+    if (!isValid) {
+      setProjectNameError("Project name must be lowercase, contain only letters, numbers, and hyphens");
+    } else {
+      setProjectNameError("");
+    }
+    
+    return isValid;
+  };
+
+  const handleProjectNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setProjectName(value);
+    if (value.trim()) {
+      validateProjectName(value);
+    } else {
+      setProjectNameError("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !apiKey.trim() || !projectName.trim()) {
+      return;
+    }
+
+    // Validate project name before submission
+    if (!validateProjectName(projectName.trim())) {
       return;
     }
 
@@ -72,7 +102,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
     }
   };
 
-  const canSubmit = message.trim() && apiKey.trim() && projectName.trim();
+  const canSubmit = message.trim() && apiKey.trim() && projectName.trim() && !projectNameError;
 
   return (
     <motion.div
@@ -130,12 +160,19 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
                 <Input
                   id="projectName"
                   type="text"
-                  placeholder="Enter your project name"
+                  placeholder="e.g., my-awesome-project"
                   value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="h-12 border-2 border-gray-200 focus:border-purple-500 transition-colors"
+                  onChange={handleProjectNameChange}
+                  className={`h-12 border-2 transition-colors ${
+                    projectNameError 
+                      ? "border-red-500 focus:border-red-500" 
+                      : "border-gray-200 focus:border-purple-500"
+                  }`}
                   required
                 />
+                {projectNameError && (
+                  <p className="text-sm text-red-500 mt-1">{projectNameError}</p>
+                )}
               </div>
             </div>
 

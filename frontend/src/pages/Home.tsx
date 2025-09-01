@@ -1,15 +1,22 @@
-import { motion } from "framer-motion";
+
+import { useNavigate } from "react-router-dom";
 import WebsiteBuilderForm from "@/components/WebsiteBuilderForm";
 
 const Home = () => {
+  const navigate = useNavigate();
+
   const handleFormSubmit = async (data: {
     message: string;
     apiKey: string;
     projectName: string;
   }) => {
     console.log("Form submitted:", data);
-    // Here you would typically send the data to your API
-    // For now, we'll just log it
+    
+    // Store API key in localStorage for the chat interface
+    localStorage.setItem('codexhub_api_key', data.apiKey);
+    
+    // Navigate to chat interface
+    navigate(`/chat/${data.projectName}`);
   };
 
   return (
