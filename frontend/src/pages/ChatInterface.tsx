@@ -93,21 +93,25 @@ const TaskCard = ({ task, onRemove }: { task: ActiveTask; onRemove: (taskId: str
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
-      className="mb-1"
+      className="mb-2"
     >
-      <div className={`p-1.5 border rounded-md ${getStatusColor()} w-full overflow-hidden`}>
-        <div className="flex items-center gap-1">
-          {getStatusIcon()}
-          <Badge variant="outline" className="text-xs px-1.5 py-0.5 flex-shrink-0">
-            {getStatusText()}
-          </Badge>
-          <span className="text-xs text-gray-600 truncate flex-1" title={task.task}>
-            {task.task}
-          </span>
+      <div className={`p-2 border rounded-md ${getStatusColor()} w-full`}>
+        <div className="flex items-start gap-2">
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {getStatusIcon()}
+            <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+              {getStatusText()}
+            </Badge>
+          </div>
+          <div className="flex-1 min-w-0">
+            <span className="text-xs text-gray-600 break-words leading-relaxed block">
+              {task.task}
+            </span>
+          </div>
           {(task.status === 'completed' || task.status === 'failed') && (
             <button
               onClick={() => onRemove(task.id)}
-              className="h-3 w-3 p-0 opacity-50 hover:opacity-100 flex-shrink-0 text-xs leading-none"
+              className="h-4 w-4 p-0 opacity-50 hover:opacity-100 flex-shrink-0 text-xs leading-none flex items-center justify-center rounded-full hover:bg-gray-200"
             >
               ×
             </button>
@@ -477,7 +481,7 @@ const ChatInterface = () => {
   return (
     <div className="h-screen flex bg-gray-50">
       {/* Chat Interface - Left Side */}
-      <div className="w-1/4 flex flex-col border-r border-gray-200">
+      <div className="w-1/4 min-w-[320px] flex flex-col border-r border-gray-200">
         {/* Header */}
         <div className="p-4 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between">
@@ -521,7 +525,7 @@ const ChatInterface = () => {
 
         {/* Messages */}
         <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
+          <div className="space-y-6">
             {messages.map((message) => {
               // Find associated task for this message
               const associatedTask = message.taskId ? activeTasks.find(task => task.id === message.taskId) : null;
@@ -539,13 +543,13 @@ const ChatInterface = () => {
                       </div>
                     )}
                     
-                    <Card className={`max-w-[80%] p-3 ${
+                    <Card className={`max-w-[85%] p-3 ${
                       message.sender === 'user' 
                         ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' 
                         : 'bg-white border-gray-200'
                     }`}>
-                      <p className="text-sm">{message.content}</p>
-                      <p className={`text-xs mt-1 ${
+                      <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>
+                      <p className={`text-xs mt-2 ${
                         message.sender === 'user' ? 'text-purple-100' : 'text-gray-400'
                       }`}>
                         {message.timestamp.toLocaleTimeString()}
@@ -561,7 +565,7 @@ const ChatInterface = () => {
                   
                   {/* Show task card inline after bot message if there's an associated task */}
                   {message.sender === 'bot' && associatedTask && (
-                    <div className="ml-11 mt-1 w-[calc(100%-2.75rem)]">
+                    <div className="ml-11 mt-3 w-[calc(100%-2.75rem)]">
                       <TaskCard
                         task={associatedTask}
                         onRemove={removeTask}
@@ -586,7 +590,7 @@ const ChatInterface = () => {
                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    <span className="text-sm text-gray-500 ml-2">Starting your request...</span>
+                    <span className="text-sm text-gray-500 ml-2 break-words">Starting your request...</span>
                   </div>
                 </Card>
               </motion.div>
@@ -629,7 +633,7 @@ const ChatInterface = () => {
       </div>
 
       {/* Website Preview - Right Side */}
-      <div className="w-3/4 flex flex-col">
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Preview Header */}
         <div className="p-4 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between">
