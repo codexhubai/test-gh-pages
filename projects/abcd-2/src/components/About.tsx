@@ -1,25 +1,26 @@
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { FaGraduationCap, FaUsers, FaLaptop, FaStar } from 'react-icons/fa';
 
-const About = () => {
+const Instructors = () => {
   const stats = [
-    { label: 'Years of Experience', value: '10+' },
-    { label: 'Projects Completed', value: '250+' },
-    { label: 'Client Satisfaction', value: '98%' },
-    { label: 'Team Members', value: '35+' }
+    { label: 'Expert Instructors', value: '25+', icon: <FaUsers className="text-indigo-600 dark:text-indigo-400" size={20} /> },
+    { label: 'Years Teaching', value: '12+', icon: <FaGraduationCap className="text-indigo-600 dark:text-indigo-400" size={20} /> },
+    { label: 'Courses Available', value: '50+', icon: <FaLaptop className="text-indigo-600 dark:text-indigo-400" size={20} /> },
+    { label: 'Student Success Rate', value: '95%', icon: <FaStar className="text-indigo-600 dark:text-indigo-400" size={20} /> }
   ];
   
   const highlights = [
-    'Experienced team of software engineers, designers, and project managers',
-    'Agile development methodology for faster delivery and better adaptability',
-    'Focus on scalable, future-proof solutions',
-    'Dedicated support and maintenance services',
-    'Commitment to code quality and performance',
-    'Transparent communication throughout the project lifecycle'
+    'Small class sizes with personalized attention from instructors',
+    'Live coding sessions and interactive workshops for hands-on learning',
+    'Industry-relevant curriculum updated with the latest technologies',
+    'Career mentorship and job placement assistance',
+    'Access to a supportive community of students and alumni',
+    'Flexible learning options including part-time and full-time schedules'
   ];
 
   return (
-    <section id="about" className="py-16 md:py-24 bg-gray-50 dark:bg-gray-800">
+    <section id="instructors" className="py-16 md:py-24 bg-gray-50 dark:bg-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           {/* About Text */}
@@ -29,21 +30,23 @@ const About = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <h2 className="text-base text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide uppercase">About Us</h2>
+            <div className="inline-block px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-sm font-medium mb-4">
+              Meet Our Team
+            </div>
             <h3 className="mt-2 text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white">
-              Innovative Software Solutions Since 2014
+              Learn From Industry Professionals
             </h3>
             
             <p className="mt-4 text-lg text-gray-600 dark:text-gray-300">
-              Codex Solutions specializes in creating cutting-edge software that solves complex business challenges. 
-              We combine technical expertise with creative thinking to deliver solutions that exceed expectations.
+              At CodeCraft Academy, our instructors bring years of real-world experience from top tech companies. 
+              They're passionate about coding and even more passionate about teaching the next generation of developers.
             </p>
             
             <div className="mt-8 space-y-4">
               {highlights.map((item, index) => (
                 <div key={index} className="flex items-start">
                   <div className="flex-shrink-0">
-                    <Check className="h-6 w-6 text-green-500" />
+                    <Check className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <p className="ml-3 text-base text-gray-600 dark:text-gray-300">{item}</p>
                 </div>
@@ -60,8 +63,8 @@ const About = () => {
           >
             <div className="relative">
               <img 
-                src="https://storage.googleapis.com/fenado-ai-farm-public/generated/b9733f64-ff7c-409f-851a-7baccc75893b.webp" 
-                alt="Digital Transformation" 
+                src="https://storage.googleapis.com/fenado-ai-farm-public/generated/4c8e4969-5031-429f-85da-391037513d22.webp" 
+                alt="CodeCraft Academy instructors" 
                 className="rounded-lg shadow-xl w-full"
               />
               
@@ -70,7 +73,10 @@ const About = () => {
                 <div className="grid grid-cols-2 gap-4">
                   {stats.map((stat, index) => (
                     <div key={index} className="text-center">
-                      <p className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400">{stat.value}</p>
+                      <div className="flex items-center justify-center mb-1">
+                        {stat.icon}
+                        <p className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400 ml-2">{stat.value}</p>
+                      </div>
                       <p className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
                     </div>
                   ))}
@@ -84,4 +90,4 @@ const About = () => {
   );
 };
 
-export default About;
+export default Instructors;
