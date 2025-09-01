@@ -1,5 +1,5 @@
-# Workflow for deploying frontend to GitHub Pages root
-name: Deploy Frontend to Pages
+# Enhanced workflow for deploying frontend to GitHub Pages with release management
+name: Deploy frontend to Pages with Release Management
 
 on:
   # Runs on pushes targeting the default branch
@@ -54,14 +54,14 @@ jobs:
         id: check-artifacts
         run: |
           if [ -n "${{ steps.latest-release.outputs.tag_name }}" ]; then
-            # Check if the release has frontend artifacts
-            ARTIFACTS=$(gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("frontend")) | .name' 2>/dev/null || echo "")
+            # Check if the release has dist artifacts
+            ARTIFACTS=$(gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("dist")) | .name' 2>/dev/null || echo "")
             if [ -n "$ARTIFACTS" ]; then
               echo "has-artifacts=true" >> $GITHUB_OUTPUT
-              echo "Found frontend artifacts in latest release"
+              echo "Found dist artifacts in latest release"
             else
               echo "has-artifacts=false" >> $GITHUB_OUTPUT
-              echo "No frontend artifacts found in latest release"
+              echo "No dist artifacts found in latest release"
             fi
           else
             echo "has-artifacts=false" >> $GITHUB_OUTPUT
@@ -70,14 +70,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Download latest frontend artifacts
+      - name: Download latest dist artifacts
         if: steps.check-artifacts.outputs.has-artifacts == 'true'
         run: |
           # Create dist directory
           mkdir -p dist
           
-          # Download all frontend-related assets from the latest release
-          gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("frontend")) | .browser_download_url' | while read url; do
+          # Download all dist-related assets from the latest release
+          gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("dist")) | .browser_download_url' | while read url; do
             if [ -n "$url" ]; then
               echo "Downloading: $url"
               wget -q "$url" -O temp_artifact.zip
@@ -95,7 +95,7 @@ jobs:
         if: steps.check-artifacts.outputs.has-artifacts == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-artifacts
+          name: dist-artifacts
           path: dist/
           retention-days: 1
 
@@ -143,23 +143,24 @@ jobs:
         if: needs.download-artifacts.outputs.has-artifacts == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: frontend-artifacts
+          name: dist-artifacts
           path: dist/
       
-      - name: Build frontend and deploy to root
+      - name: Build frontend and merge into dist/
         if: steps.frontend-changed.outputs.changed == 'true'
         run: |
           set -euo pipefail
-          # Ensure dist directory exists
+          # Ensure dist directory exists (created in previous step)
           mkdir -p dist
           
           echo "Building frontend with environment variables"
           (cd frontend && bun install --silent && bun run build)
           
-          # Copy frontend build to root of dist (overwriting any existing content)
-          cp -R frontend/dist/. dist/
+          # Create app directory and copy frontend build there
+          mkdir -p dist/app
+          cp -R frontend/dist/. dist/app/
           
-          echo "Frontend deployed to root of dist directory"
+          echo "Added/updated frontend to dist/app directory"
           echo "Final dist directory contents:"
           ls -la dist
         env:
@@ -198,12 +199,12 @@ jobs:
           # Generate version tag based on timestamp and commit hash
           TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
           COMMIT_HASH=$(git rev-parse --short HEAD)
-          VERSION_TAG="frontend-v${TIMESTAMP}-${COMMIT_HASH}"
+          VERSION_TAG="v${TIMESTAMP}-${COMMIT_HASH}"
           
-          echo "Creating frontend release tag: $VERSION_TAG"
+          echo "Creating release tag: $VERSION_TAG"
           
           # Create and push the tag
-          git tag -a "$VERSION_TAG" -m "Frontend Release $VERSION_TAG"
+          git tag -a "$VERSION_TAG" -m "Release $VERSION_TAG - Deployed frontend"
           git push origin "$VERSION_TAG"
           
           # Wait a moment for the tag to be available
@@ -211,18 +212,18 @@ jobs:
           
           # Create release with the tag
           gh release create "$VERSION_TAG" \
-            --title "Frontend Release $VERSION_TAG" \
-            --notes "Automated frontend release" \
+            --title "Release $VERSION_TAG" \
+            --notes "Automated release containing built frontend" \
             --generate-notes
           
           # Create a zip file of the dist directory
           cd dist
-          zip -r "../frontend-artifacts.zip" .
+          zip -r "../dist-artifacts.zip" .
           cd ..
           
-          # Upload the frontend artifacts to the release
-          gh release upload "$VERSION_TAG" frontend-artifacts.zip --clobber
+          # Upload the dist artifacts to the release
+          gh release upload "$VERSION_TAG" dist-artifacts.zip --clobber
           
-          echo "Successfully created frontend release $VERSION_TAG with artifacts"
+          echo "Successfully created release $VERSION_TAG with dist artifacts"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
