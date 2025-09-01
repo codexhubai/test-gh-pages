@@ -1,0 +1,228 @@
+# Workflow for deploying frontend to GitHub Pages root
+name: Deploy Frontend to Pages
+
+on:
+  # Runs on pushes targeting the default branch
+  push:
+    branches: ["main"]
+    paths:
+      - 'frontend/**'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages and release management
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  actions: read
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  # Download latest release artifacts
+  download-artifacts:
+    runs-on: ubuntu-latest
+    outputs:
+      has-artifacts: ${{ steps.check-artifacts.outputs.has-artifacts }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Get latest release
+        id: latest-release
+        run: |
+          # Get the latest release
+          LATEST_RELEASE=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name' 2>/dev/null || echo "")
+          if [ -n "$LATEST_RELEASE" ]; then
+            echo "tag_name=$LATEST_RELEASE" >> $GITHUB_OUTPUT
+            echo "Found latest release: $LATEST_RELEASE"
+          else
+            echo "No releases found"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Check if artifacts exist
+        id: check-artifacts
+        run: |
+          if [ -n "${{ steps.latest-release.outputs.tag_name }}" ]; then
+            # Check if the release has frontend artifacts
+            ARTIFACTS=$(gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("frontend")) | .name' 2>/dev/null || echo "")
+            if [ -n "$ARTIFACTS" ]; then
+              echo "has-artifacts=true" >> $GITHUB_OUTPUT
+              echo "Found frontend artifacts in latest release"
+            else
+              echo "has-artifacts=false" >> $GITHUB_OUTPUT
+              echo "No frontend artifacts found in latest release"
+            fi
+          else
+            echo "has-artifacts=false" >> $GITHUB_OUTPUT
+            echo "No releases found"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Download latest frontend artifacts
+        if: steps.check-artifacts.outputs.has-artifacts == 'true'
+        run: |
+          # Create dist directory
+          mkdir -p dist
+          
+          # Download all frontend-related assets from the latest release
+          gh api repos/${{ github.repository }}/releases/tags/${{ steps.latest-release.outputs.tag_name }} --jq '.assets[] | select(.name | contains("frontend")) | .browser_download_url' | while read url; do
+            if [ -n "$url" ]; then
+              echo "Downloading: $url"
+              wget -q "$url" -O temp_artifact.zip
+              unzip -q temp_artifact.zip -d dist/
+              rm temp_artifact.zip
+            fi
+          done
+          
+          echo "Downloaded artifacts to dist directory:"
+          ls -la dist/
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload dist artifacts for next job
+        if: steps.check-artifacts.outputs.has-artifacts == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-artifacts
+          path: dist/
+          retention-days: 1
+
+  # Build and deploy job
+  deploy:
+    needs: download-artifacts
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      
+      - name: Check if frontend changed
+        id: frontend-changed
+        run: |
+          set -euo pipefail
+          # Determine a base commit for the diff
+          if [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          fi
+          # Ensure BASE exists in the local clone (handle shallow clones / rebases)
+          if ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            BASE=$(git rev-parse HEAD^ 2>/dev/null || git rev-list --max-parents=0 HEAD)
+          fi
+          # Check if any files in frontend/ directory changed
+          if git diff --name-only "$BASE" HEAD | grep -q "^frontend/"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Frontend changes detected"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No frontend changes detected"
+          fi
+      
+      - name: Download existing dist artifacts
+        if: needs.download-artifacts.outputs.has-artifacts == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-artifacts
+          path: dist/
+      
+      - name: Build frontend and deploy to root
+        if: steps.frontend-changed.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          # Ensure dist directory exists
+          mkdir -p dist
+          
+          echo "Building frontend with environment variables"
+          (cd frontend && bun install --silent && bun run build)
+          
+          # Copy frontend build to root of dist (overwriting any existing content)
+          cp -R frontend/dist/. dist/
+          
+          echo "Frontend deployed to root of dist directory"
+          echo "Final dist directory contents:"
+          ls -la dist
+        env:
+          VITE_GITHUB_PAGES_URL: ${{ vars.VITE_GITHUB_PAGES_URL }}
+          VITE_CODEXHUB_AGENT_URL: ${{ vars.VITE_CODEXHUB_AGENT_URL }}
+      
+      - name: Skip (no frontend changes)
+        if: steps.frontend-changed.outputs.changed == 'false'
+        run: echo "No changes in frontend/; skipping build and deploy."
+      
+      - name: Setup Pages
+        if: steps.frontend-changed.outputs.changed == 'true'
+        uses: actions/configure-pages@v5
+      
+      - name: Upload artifact
+        if: steps.frontend-changed.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload dist folder (contains frontend at root)
+          path: './dist'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: steps.frontend-changed.outputs.changed == 'true'
+        uses: actions/deploy-pages@v4
+      
+      - name: Create release tag and upload artifacts
+        if: steps.frontend-changed.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          
+          # Configure Git identity for tag creation
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
+          # Generate version tag based on timestamp and commit hash
+          TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          VERSION_TAG="frontend-v${TIMESTAMP}-${COMMIT_HASH}"
+          
+          echo "Creating frontend release tag: $VERSION_TAG"
+          
+          # Create and push the tag
+          git tag -a "$VERSION_TAG" -m "Frontend Release $VERSION_TAG"
+          git push origin "$VERSION_TAG"
+          
+          # Wait a moment for the tag to be available
+          sleep 5
+          
+          # Create release with the tag
+          gh release create "$VERSION_TAG" \
+            --title "Frontend Release $VERSION_TAG" \
+            --notes "Automated frontend release" \
+            --generate-notes
+          
+          # Create a zip file of the dist directory
+          cd dist
+          zip -r "../frontend-artifacts.zip" .
+          cd ..
+          
+          # Upload the frontend artifacts to the release
+          gh release upload "$VERSION_TAG" frontend-artifacts.zip --clobber
+          
+          echo "Successfully created frontend release $VERSION_TAG with artifacts"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
