@@ -10,7 +10,7 @@ const Home = () => {
         className="text-center"
       >
         <h1 className="text-7xl font-bold text-white tracking-tight">
-          bye world
+          hello Raunak!
         </h1>
       </motion.div>
     </div>
