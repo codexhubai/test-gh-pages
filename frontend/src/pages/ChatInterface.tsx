@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { 
   Send,
   Bot,
@@ -12,7 +13,11 @@ import {
   RefreshCw,
   ExternalLink,
   ArrowLeft,
-  AlertCircle
+  AlertCircle,
+  Clock,
+  CheckCircle,
+  XCircle,
+  Loader2
 } from "lucide-react";
 import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
 import { taskService, Task, TaskResponse } from "@/services/taskService";
@@ -27,6 +32,96 @@ interface Message {
   taskId?: string; // Track associated task ID
 }
 
+interface ActiveTask {
+  id: string;
+  task: string;
+  status: Task['status'];
+  createdAt: Date;
+  updatedAt: Date;
+  messageId?: string; // Associated message ID
+}
+
+// TaskCard component for inline display
+const TaskCard = ({ task, onRemove }: { task: ActiveTask; onRemove: (taskId: string) => void }) => {
+  const getStatusIcon = () => {
+    switch (task.status) {
+      case 'pending':
+        return <Clock className="w-3 h-3 text-yellow-500" />;
+      case 'in_progress':
+        return <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />;
+      case 'completed':
+        return <CheckCircle className="w-3 h-3 text-green-500" />;
+      case 'failed':
+        return <XCircle className="w-3 h-3 text-red-500" />;
+      default:
+        return <Clock className="w-3 h-3 text-gray-500" />;
+    }
+  };
+
+  const getStatusColor = () => {
+    switch (task.status) {
+      case 'pending':
+        return 'bg-yellow-50 border-yellow-200';
+      case 'in_progress':
+        return 'bg-blue-50 border-blue-200';
+      case 'completed':
+        return 'bg-green-50 border-green-200';
+      case 'failed':
+        return 'bg-red-50 border-red-200';
+      default:
+        return 'bg-gray-50 border-gray-200';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (task.status) {
+      case 'pending':
+        return 'Queued';
+      case 'in_progress':
+        return 'In Progress';
+      case 'completed':
+        return 'Completed';
+      case 'failed':
+        return 'Failed';
+      default:
+        return 'Unknown';
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="mb-3"
+    >
+      <Card className={`p-2 border ${getStatusColor()}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            {getStatusIcon()}
+            <Badge variant="outline" className="text-xs">
+              {getStatusText()}
+            </Badge>
+            <span className="text-xs text-gray-600 truncate" title={task.task}>
+              {task.task}
+            </span>
+          </div>
+          {(task.status === 'completed' || task.status === 'failed') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onRemove(task.id)}
+              className="h-5 w-5 p-0 opacity-50 hover:opacity-100 ml-2"
+            >
+              ×
+            </Button>
+          )}
+        </div>
+      </Card>
+    </motion.div>
+  );
+};
+
 const ChatInterface = () => {
   const { projectName } = useParams<{ projectName: string }>();
   const navigate = useNavigate();
@@ -35,8 +130,7 @@ const ChatInterface = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
-  const [taskStatus, setTaskStatus] = useState<Task['status'] | null>(null);
+  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -51,68 +145,78 @@ const ChatInterface = () => {
 
   // Task polling effect
   useEffect(() => {
-    if (activeTaskId && apiKey) {
-      const pollTask = async () => {
-        try {
-          const response = await taskService.getTaskById(activeTaskId, apiKey);
-          
-          if (response.success) {
-            const task = response.task;
-            setTaskStatus(task.status);
-            
-            if (taskService.isTaskComplete(task.status)) {
-              // Task completed, stop polling
-              if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current);
-                pollingIntervalRef.current = null;
-              }
-              
-              // Update the bot message with the result
-              setMessages(prev => prev.map(msg => {
-                if (msg.taskId === activeTaskId) {
-                  let resultMessage = "";
-                  
-                  if (task.status === 'completed') {
-                    if (task.result?.message) {
-                      resultMessage = task.result.message;
-                    } else if (task.result?.task?.summary) {
-                      resultMessage = task.result.task.summary;
-                    } else {
-                      resultMessage = "Task completed successfully! Your changes have been applied.";
-                    }
-                  } else if (task.status === 'failed') {
-                    resultMessage = "Task failed. Please try again or contact support if the issue persists.";
-                  }
-                  
-                  return {
-                    ...msg,
-                    content: resultMessage
-                  };
-                }
-                return msg;
-              }));
-              
-              // Refresh the iframe to show updated website
-              if (iframeRef.current) {
-                iframeRef.current.src = iframeRef.current.src;
-              }
-              
-              // Clear active task
-              setActiveTaskId(null);
-              setTaskStatus(null);
-              setIsLoading(false);
-            }
-          } else {
-            console.error('Failed to fetch task status:', (response as any).message);
+    if (activeTasks.length > 0 && apiKey) {
+      const pollTasks = async () => {
+        const tasksToPoll = activeTasks.filter(task => 
+          task.status === 'pending' || task.status === 'in_progress'
+        );
+        
+        if (tasksToPoll.length === 0) {
+          // No active tasks to poll, clear interval
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
           }
-        } catch (error) {
-          console.error('Error polling task:', error);
+          return;
+        }
+
+        for (const activeTask of tasksToPoll) {
+          try {
+            const response = await taskService.getTaskById(activeTask.id, apiKey);
+            
+            if (response.success) {
+              const task = response.task;
+              
+              // Update the task in our active tasks array
+              setActiveTasks(prev => prev.map(t => 
+                t.id === activeTask.id 
+                  ? { ...t, status: task.status, updatedAt: new Date() }
+                  : t
+              ));
+              
+              if (taskService.isTaskComplete(task.status)) {
+                // Update the bot message with the result
+                setMessages(prev => prev.map(msg => {
+                  if (msg.taskId === activeTask.id) {
+                    let resultMessage = "";
+                    
+                    if (task.status === 'completed') {
+                      if (task.result?.message) {
+                        resultMessage = task.result.message;
+                      } else if (task.result?.task?.summary) {
+                        resultMessage = task.result.task.summary;
+                      } else {
+                        resultMessage = "Task completed successfully! Your changes have been applied.";
+                      }
+                    } else if (task.status === 'failed') {
+                      resultMessage = "Task failed. Please try again or contact support if the issue persists.";
+                    }
+                    
+                    return {
+                      ...msg,
+                      content: resultMessage
+                    };
+                  }
+                  return msg;
+                }));
+                
+                // Refresh the iframe to show updated website
+                if (iframeRef.current) {
+                  iframeRef.current.src = iframeRef.current.src;
+                }
+              }
+            } else {
+              console.error('Failed to fetch task status:', (response as any).message);
+            }
+          } catch (error) {
+            console.error('Error polling task:', error);
+          }
         }
       };
       
       // Poll immediately, then every 30 seconds
-      pollTask();
-      pollingIntervalRef.current = setInterval(pollTask, 30000);
+      pollTasks();
+      pollingIntervalRef.current = setInterval(pollTasks, 30000);
     }
     
     return () => {
@@ -121,7 +225,7 @@ const ChatInterface = () => {
         pollingIntervalRef.current = null;
       }
     };
-  }, [activeTaskId, apiKey]);
+  }, [activeTasks, apiKey]);
 
   // Initialize welcome message
   useEffect(() => {
@@ -143,7 +247,10 @@ const ChatInterface = () => {
   }, [projectName, navigate]);
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || activeTaskId) return;
+    const hasActiveTasks = activeTasks.some(task => 
+      task.status === 'pending' || task.status === 'in_progress'
+    );
+    if (!inputMessage.trim() || isLoading || hasActiveTasks) return;
 
     // Check if API key is set
     if (!isApiKeySet) {
@@ -188,18 +295,26 @@ const ChatInterface = () => {
       );
 
       if (response.success && response.task.metadata?.codexTaskId) {
-        // Task started successfully, start polling
-        setActiveTaskId(response.task.metadata?.codexTaskId);
-        setTaskStatus('pending');
+        // Task started successfully, add to active tasks
+        const taskId = response.task.metadata?.codexTaskId;
+        const newTask: ActiveTask = {
+          id: taskId,
+          task: inputMessage.trim(),
+          status: 'pending',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
         
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: "I've started processing your request. This may take a few minutes...",
+          content: "I've started processing your request. This may take several minutes, grab a coffee (10 mins Approx)...",
           sender: 'bot',
           timestamp: new Date(),
-          taskId: response.task.metadata?.codexTaskId
+          taskId: taskId
         };
 
+        // Add both the task and message
+        setActiveTasks(prev => [...prev, newTask]);
         setMessages(prev => [...prev, botMessage]);
       } else {
         // No task ID or failed response
@@ -239,6 +354,10 @@ const ChatInterface = () => {
     if (iframeRef.current) {
       iframeRef.current.src = iframeRef.current.src;
     }
+  };
+
+  const removeTask = (taskId: string) => {
+    setActiveTasks(prev => prev.filter(task => task.id !== taskId));
   };
 
   if (!projectName) {
@@ -282,6 +401,13 @@ const ChatInterface = () => {
                     </div>
                   )}
                 </div>
+                {activeTasks.length > 0 && (
+                  <div className="mt-1">
+                    <Badge variant="outline" className="text-xs">
+                      {activeTasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length} active task{activeTasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length !== 1 ? 's' : ''}
+                    </Badge>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -293,39 +419,55 @@ const ChatInterface = () => {
         {/* Messages */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {message.sender === 'bot' && (
-                  <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Bot className="w-4 h-4 text-white" />
-                  </div>
-                )}
-                
-                <Card className={`max-w-[80%] p-3 ${
-                  message.sender === 'user' 
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' 
-                    : 'bg-white border-gray-200'
-                }`}>
-                  <p className="text-sm">{message.content}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.sender === 'user' ? 'text-purple-100' : 'text-gray-400'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                </Card>
+            {messages.map((message) => {
+              // Find associated task for this message
+              const associatedTask = message.taskId ? activeTasks.find(task => task.id === message.taskId) : null;
+              
+              return (
+                <div key={message.id}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {message.sender === 'bot' && (
+                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
+                        <Bot className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    
+                    <Card className={`max-w-[80%] p-3 ${
+                      message.sender === 'user' 
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' 
+                        : 'bg-white border-gray-200'
+                    }`}>
+                      <p className="text-sm">{message.content}</p>
+                      <p className={`text-xs mt-1 ${
+                        message.sender === 'user' ? 'text-purple-100' : 'text-gray-400'
+                      }`}>
+                        {message.timestamp.toLocaleTimeString()}
+                      </p>
+                    </Card>
 
-                {message.sender === 'user' && (
-                  <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-gray-600" />
-                  </div>
-                )}
-              </motion.div>
-            ))}
+                    {message.sender === 'user' && (
+                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                        <User className="w-4 h-4 text-gray-600" />
+                      </div>
+                    )}
+                  </motion.div>
+                  
+                  {/* Show task card inline after bot message if there's an associated task */}
+                  {message.sender === 'bot' && associatedTask && (
+                    <div className="ml-11 mt-2">
+                      <TaskCard
+                        task={associatedTask}
+                        onRemove={removeTask}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
             
             {isLoading && (
               <motion.div
@@ -347,28 +489,7 @@ const ChatInterface = () => {
               </motion.div>
             )}
 
-            {activeTaskId && taskStatus && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 justify-start"
-              >
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-                <Card className="bg-white border-gray-200 p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
-                    <span className="text-sm text-gray-500">
-                      Task {taskStatus === 'pending' ? 'queued' : taskStatus === 'in_progress' ? 'in progress' : taskStatus}...
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Task ID: {activeTaskId.slice(0, 8)}...
-                  </p>
-                </Card>
-              </motion.div>
-            )}
+
             
             <div ref={messagesEndRef} />
           </div>
@@ -376,7 +497,7 @@ const ChatInterface = () => {
 
         {/* Input */}
         <div className="p-4 border-t border-gray-200 bg-white">
-          {activeTaskId && (
+          {activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress') && (
             <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-700">
                 A task is currently running. Please wait for it to complete before sending another message.
@@ -388,14 +509,14 @@ const ChatInterface = () => {
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder={activeTaskId ? "Please wait for the current task to complete..." : "Describe the changes you want to make..."}
+              placeholder={activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress') ? "Please wait for the current task to complete..." : "Describe the changes you want to make..."}
               className="flex-1 min-h-[80px] resize-none"
-              disabled={isLoading || !!activeTaskId}
+              disabled={isLoading || activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress')}
               rows={3}
             />
             <Button
               onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading || !!activeTaskId}
+              disabled={!inputMessage.trim() || isLoading || activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress')}
               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 self-end"
             >
               <Send className="w-4 h-4" />
