@@ -14,6 +14,8 @@ const Home = () => {
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
       >
+        <h1>Home</h1> 
+        <img src="/logo.png" alt="Logo" />
         <HeroSection />
         <FeaturesSection />
         <TestimonialsSection />
