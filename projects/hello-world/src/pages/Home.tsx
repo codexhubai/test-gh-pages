@@ -16,7 +16,7 @@ const Home = () => {
           animate={{ scale: 1, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.5 }}
         >
-          Hello World
+          Hello World Really
         </motion.h1>
       </motion.div>
     </div>
