@@ -11,11 +11,11 @@ const Home = () => {
       >
         {/* CodexHub Logo */}
         <div className="mb-8">
-          {/* <img 
-            src="logo.png" 
+          <img 
+            src="/logo.png" 
             alt="CodexHub Logo" 
             className="w-24 h-24 mx-auto object-contain"
-          /> */}
+          />
         </div>
         
         {/* Main Message */}
