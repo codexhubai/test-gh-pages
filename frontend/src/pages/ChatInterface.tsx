@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
@@ -94,7 +94,10 @@ const ChatInterface = () => {
       
       const agentRequest: RunAgentRequest = {
         repoUrl: repoUrl,
-        prompt: inputMessage.trim(),
+        prompt: `
+        I want to work in ${projectName} folder.
+        Here is my request:
+        ${inputMessage.trim()}`,
         branchName: null,
         autoMerge: true,
         attachments: []
@@ -193,15 +196,6 @@ const ChatInterface = () => {
             </div>
             <div className="flex items-center gap-2">
               <ApiKeyDialog />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshWebsite}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
             </div>
           </div>
         </div>
@@ -270,18 +264,19 @@ const ChatInterface = () => {
         {/* Input */}
         <div className="p-4 border-t border-gray-200 bg-white">
           <div className="flex gap-2">
-            <Input
+            <Textarea
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyPress={handleKeyPress}
               placeholder="Describe the changes you want to make..."
-              className="flex-1"
+              className="flex-1 min-h-[80px] resize-none"
               disabled={isLoading}
+              rows={3}
             />
             <Button
               onClick={handleSendMessage}
               disabled={!inputMessage.trim() || isLoading}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 self-end"
             >
               <Send className="w-4 h-4" />
             </Button>
@@ -295,15 +290,26 @@ const ChatInterface = () => {
         <div className="p-4 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-800">Website Preview</h2>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.open(`/projects/${projectName}`, '_blank')}
-              className="flex items-center gap-2"
-            >
-              <ExternalLink className="w-4 h-4" />
-              Open in New Tab
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshWebsite}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`/projects/${projectName}`, '_blank')}
+                className="flex items-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                Open in New Tab
+              </Button>
+            </div>
           </div>
         </div>
 

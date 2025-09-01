@@ -16,7 +16,7 @@ const Home = () => {
     localStorage.setItem('codexhub_api_key', data.apiKey);
     
     // Navigate to chat interface
-    navigate(`/chat/${data.projectName}`);
+    navigate(`/projects/${data.projectName}`);
   };
 
   return (
