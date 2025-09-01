@@ -66,10 +66,12 @@ const Navbar = () => {
 
           {/* Cart and Menu Buttons */}
           <div className="flex items-center space-x-3">
-            <Button variant="ghost" size="icon" className="relative">
-              <ShoppingCart className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 px-1.5 py-0.5">3</Badge>
-            </Button>
+            <Link to="/cart">
+              <Button variant="ghost" size="icon" className="relative">
+                <ShoppingCart className="h-5 w-5" />
+                <Badge className="absolute -top-1 -right-1 px-1.5 py-0.5">3</Badge>
+              </Button>
+            </Link>
             
             {isMobile && (
               <Sheet open={isOpen} onOpenChange={setIsOpen}>
