@@ -150,7 +150,12 @@ const ChatInterface = () => {
 
   // Memoize the polling function to prevent recreation on every render
   const pollTasks = useCallback(async () => {
-    if (tasksToPoll.length === 0 || !apiKey) {
+    // Get current active tasks that need polling
+    const currentActiveTasks = activeTasks.filter(task => 
+      task.status === 'pending' || task.status === 'in_progress'
+    );
+    
+    if (currentActiveTasks.length === 0 || !apiKey) {
       // No active tasks to poll, clear interval
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -174,7 +179,7 @@ const ChatInterface = () => {
     }
 
     // Batch API calls for better performance
-    const taskPromises = tasksToPoll.map(async (activeTask) => {
+    const taskPromises = currentActiveTasks.map(async (activeTask) => {
       try {
         const response = await taskService.getTaskById(activeTask.id, apiKey);
         return { activeTask, response };
@@ -205,10 +210,10 @@ const ChatInterface = () => {
               let resultMessage = "";
               
               if (task.status === 'completed') {
-                if (task.result?.message) {
-                  resultMessage = task.result.message;
-                } else if (task.result?.task?.summary) {
+               if (task.result?.task?.summary) {
                   resultMessage = task.result.task.summary;
+                } else if (task.result?.message) {
+                  resultMessage = task.result.message;
                 } else {
                   resultMessage = "Task completed successfully! Your changes have been applied.";
                 }
@@ -233,17 +238,28 @@ const ChatInterface = () => {
         console.error('Failed to fetch task status:', (response as any).message);
       }
     }
-  }, [tasksToPoll, apiKey, maxPollingAttempts]);
+  }, [activeTasks, apiKey, maxPollingAttempts]);
 
   // Optimized task polling effect with fixed 30-second interval
   useEffect(() => {
-    if (tasksToPoll.length > 0 && apiKey) {
+    // Check if we have active tasks that need polling
+    const hasActiveTasks = activeTasks.some(task => 
+      task.status === 'pending' || task.status === 'in_progress'
+    );
+    
+    if (hasActiveTasks && apiKey) {
       // Reset polling attempts when starting new polling
       pollingAttemptsRef.current = 0;
       
       // Poll immediately, then every 30 seconds
       pollTasks();
       pollingIntervalRef.current = setInterval(pollTasks, 30000);
+    } else {
+      // No active tasks, clear any existing interval
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
     }
     
     return () => {
@@ -252,7 +268,7 @@ const ChatInterface = () => {
         pollingIntervalRef.current = null;
       }
     };
-  }, [tasksToPoll, apiKey, pollTasks]);
+  }, [activeTasks, apiKey, pollTasks]);
 
   // Initialize welcome message and check for existing tasks
   useEffect(() => {
@@ -325,9 +341,9 @@ const ChatInterface = () => {
   // Cleanup effect to prevent memory leaks
   useEffect(() => {
     return () => {
-      // Clear any pending timeouts/intervals when component unmounts
+      // Clear any pending intervals when component unmounts
       if (pollingIntervalRef.current) {
-        clearTimeout(pollingIntervalRef.current);
+        clearInterval(pollingIntervalRef.current);
         pollingIntervalRef.current = null;
       }
     };
