@@ -20,7 +20,7 @@ const Home = () => {
         
         {/* Main Message */}
         <h1 className="text-4xl font-bold text-gray-800 mb-4">
-          Please wait
+          Please wait for a while
         </h1>
         
         <p className="text-xl text-gray-600 max-w-md mx-auto leading-relaxed">
