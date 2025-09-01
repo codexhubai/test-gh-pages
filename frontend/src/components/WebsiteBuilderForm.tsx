@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,9 +9,13 @@ import {
   Send,
   Key,
   FolderOpen,
-  AlertCircle
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Clock
 } from "lucide-react";
 import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
+import { taskService, Task } from "@/services/taskService";
 import { useApiKey } from "@/contexts/ApiKeyContext";
 import ApiKeyDialog from "@/components/ApiKeyDialog";
 
@@ -20,6 +24,7 @@ interface WebsiteBuilderFormProps {
     message: string;
     apiKey: string;
     projectName: string;
+    taskId?: string;
   }) => void;
 }
 
@@ -29,6 +34,66 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
   const [projectName, setProjectName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [projectNameError, setProjectNameError] = useState("");
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const [taskStatus, setTaskStatus] = useState<Task['status'] | null>(null);
+  const [taskResult, setTaskResult] = useState<string | null>(null);
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Task polling effect
+  useEffect(() => {
+    if (activeTaskId && apiKey) {
+      const pollTask = async () => {
+        try {
+          const response = await taskService.getTaskById(activeTaskId, apiKey);
+          
+          if (response.success) {
+            const task = response.task;
+            setTaskStatus(task.status);
+            
+            if (taskService.isTaskComplete(task.status)) {
+              // Task completed, stop polling
+              if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
+              }
+              
+              let resultMessage = "";
+              
+              if (task.status === 'completed') {
+                if (task.result?.message) {
+                  resultMessage = task.result.message;
+                } else if (task.result?.task?.summary) {
+                  resultMessage = task.result.task.summary;
+                } else {
+                  resultMessage = "Your website has been created successfully!";
+                }
+              } else if (task.status === 'failed') {
+                resultMessage = "Failed to create your website. Please try again.";
+              }
+              
+              setTaskResult(resultMessage);
+              setIsSubmitting(false);
+            }
+          } else {
+            console.error('Failed to fetch task status:', (response as any).message);
+          }
+        } catch (error) {
+          console.error('Error polling task:', error);
+        }
+      };
+      
+      // Poll immediately, then every 30 seconds
+      pollTask();
+      pollingIntervalRef.current = setInterval(pollTask, 30000);
+    }
+    
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+        pollingIntervalRef.current = null;
+      }
+    };
+  }, [activeTaskId, apiKey]);
 
   // Validate project name to be URL-friendly (lowercase, hyphens only)
   const validateProjectName = (name: string): boolean => {
@@ -56,7 +121,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!message.trim() || !projectName.trim()) {
+    if (!message.trim() || !projectName.trim() || activeTaskId) {
       return;
     }
 
@@ -71,6 +136,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
     }
 
     setIsSubmitting(true);
+    setTaskResult(null);
 
     const repoUrl = `https://github.com/codexhubai/test-gh-pages.git`;
 
@@ -95,25 +161,34 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
 
       console.log("Agent response:", response);
 
-      // Call the original onSubmit callback if provided
-      if (onSubmit) {
-        await onSubmit({
-          message: message.trim(),
-          apiKey: apiKey,
-          projectName: projectName.trim(),
-        });
+      if (response.success && response.task.metadata?.codexTaskId) {
+        // Task started successfully, start polling
+        setActiveTaskId(response.task.metadata?.codexTaskId);
+        setTaskStatus('pending');
+        
+        // Call the original onSubmit callback if provided
+        if (onSubmit) {
+          await onSubmit({
+            message: message.trim(),
+            apiKey: apiKey,
+            projectName: projectName.trim(),
+            taskId: response.task.metadata?.codexTaskId,
+          });
+        }
+      } else {
+        // No task ID or failed response
+        setTaskResult("Failed to start the task. Please try again.");
+        setIsSubmitting(false);
       }
       
     } catch (error) {
       console.error("Error calling agent:", error);
-      // You can add error handling UI here
-      // For example, show an error toast or message
-    } finally {
+      setTaskResult("An error occurred while processing your request. Please try again.");
       setIsSubmitting(false);
     }
   };
 
-  const canSubmit = message.trim() && isApiKeySet && projectName.trim() && !projectNameError;
+  const canSubmit = message.trim() && isApiKeySet && projectName.trim() && !projectNameError && !activeTaskId;
 
   return (
     <motion.div
@@ -143,6 +218,60 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
               Create apps and websites by chatting with AI
             </p>
           </div>
+
+          {/* Task Status */}
+          {activeTaskId && taskStatus && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 bg-blue-50 border border-blue-200 rounded-lg"
+            >
+              <div className="flex items-center gap-3">
+                {taskStatus === 'pending' && <Clock className="w-5 h-5 text-blue-500 animate-pulse" />}
+                {taskStatus === 'in_progress' && <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+                {taskStatus === 'completed' && <CheckCircle className="w-5 h-5 text-green-500" />}
+                {taskStatus === 'failed' && <XCircle className="w-5 h-5 text-red-500" />}
+                
+                <div>
+                  <p className="text-sm font-medium text-blue-700">
+                    {taskStatus === 'pending' && 'Task queued...'}
+                    {taskStatus === 'in_progress' && 'Creating your website...'}
+                    {taskStatus === 'completed' && 'Website created successfully!'}
+                    {taskStatus === 'failed' && 'Task failed'}
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Task ID: {activeTaskId.slice(0, 8)}...
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Task Result */}
+          {taskResult && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`p-4 border rounded-lg ${
+                taskStatus === 'completed' 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-red-50 border-red-200'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {taskStatus === 'completed' ? (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-500" />
+                )}
+                <p className={`text-sm font-medium ${
+                  taskStatus === 'completed' ? 'text-green-700' : 'text-red-700'
+                }`}>
+                  {taskResult}
+                </p>
+              </div>
+            </motion.div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -186,11 +315,12 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
                   placeholder="e.g., my-awesome-project"
                   value={projectName}
                   onChange={handleProjectNameChange}
+                  disabled={!!activeTaskId}
                   className={`h-12 border-2 transition-colors ${
                     projectNameError 
                       ? "border-red-500 focus:border-red-500" 
                       : "border-gray-200 focus:border-purple-500"
-                  }`}
+                  } ${activeTaskId ? "opacity-50 cursor-not-allowed" : ""}`}
                   required
                 />
                 {projectNameError && (
@@ -207,10 +337,13 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
               <div className="relative">
                 <Textarea
                   id="message"
-                  placeholder="Ask CodexHub to create a web app..."
+                  placeholder={activeTaskId ? "Please wait for the current task to complete..." : "Ask CodexHub to create a web app..."}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="min-h-[120px] resize-none border-2 border-gray-200 focus:border-purple-500 transition-colors pr-20"
+                  disabled={!!activeTaskId}
+                  className={`min-h-[120px] resize-none border-2 border-gray-200 focus:border-purple-500 transition-colors pr-20 ${
+                    activeTaskId ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
                   required
                 />
                 
@@ -225,7 +358,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
                     disabled={!canSubmit || isSubmitting}
                     className="h-10 w-10 p-0 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? (
+                    {isSubmitting || activeTaskId ? (
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                       <Send className="w-4 h-4" />
