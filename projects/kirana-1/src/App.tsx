@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 // Pages
 import Home from "./pages/Home";
 import ErrorPage from "./pages/ErrorPage";
+import CartPage from "./pages/CartPage";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
       <BrowserRouter basename={getRouterBasename()}>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/cart" element={<CartPage />} />
           <Route path="*" element={<ErrorPage />} />
         </Routes>
       </BrowserRouter>
