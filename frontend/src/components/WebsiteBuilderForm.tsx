@@ -10,6 +10,7 @@ import {
   Key,
   FolderOpen
 } from "lucide-react";
+import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
 
 interface WebsiteBuilderFormProps {
   onSubmit?: (data: {
@@ -32,8 +33,28 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
     }
 
     setIsSubmitting(true);
-    
+
+    const repoUrl = `https://github.com/codexhubai/test-gh-pages.git`;
+
     try {
+      // Prepare the request for the agent
+      const agentRequest: RunAgentRequest = {
+        repoUrl: repoUrl,
+        prompt: message.trim(),
+        branchName: null,
+        autoMerge: true,
+        attachments: []
+      };
+
+      // Call the RunAgent method
+      const response: RunAgentResponse = await agentService.runAgent(
+        apiKey.trim(),
+        agentRequest
+      );
+
+      console.log("Agent response:", response);
+
+      // Call the original onSubmit callback if provided
       if (onSubmit) {
         await onSubmit({
           message: message.trim(),
@@ -41,8 +62,11 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
           projectName: projectName.trim(),
         });
       }
+      
     } catch (error) {
-      console.error("Error submitting form:", error);
+      console.error("Error calling agent:", error);
+      // You can add error handling UI here
+      // For example, show an error toast or message
     } finally {
       setIsSubmitting(false);
     }
