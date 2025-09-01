@@ -1,6 +1,8 @@
 
 import { useNavigate } from "react-router-dom";
 import WebsiteBuilderForm from "@/components/WebsiteBuilderForm";
+import { Button } from "@/components/ui/button";
+import { ExternalLink, Info } from "lucide-react";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -53,9 +55,43 @@ const Home = () => {
       </header>
 
       {/* Main Content */}
-      <main className="flex items-center justify-center min-h-[calc(100vh-80px)] px-6 py-12">
+      <main className="flex items-center justify-center  px-6 py-24">
         <WebsiteBuilderForm onSubmit={handleFormSubmit} />
       </main>
+
+
+      {/* Build & Deploy Status Banner */}
+      <div className="w-full px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Info className="w-4 h-4 text-blue-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                  Build & Deploy Status
+                </h3>
+                <p className="text-blue-800 mb-4 leading-relaxed">
+                  Your website previews may not automatically refresh as we need to wait for deployment on GitHub Pages. 
+                  Please be patient while your changes are being deployed. You can check the deployment status by visiting our GitHub repository.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.open('https://github.com/codexhubai/test-gh-pages/', '_blank')}
+                  className="flex items-center gap-2 text-blue-700 border-blue-300 hover:bg-blue-50"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Check Status on GitHub
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
