@@ -12,12 +12,12 @@ const Navbar = () => {
           {/* Logo and company name */}
           <div className="flex-shrink-0 flex items-center">
             <img 
-              className="h-10 w-10 mr-2" 
-              src="https://storage.googleapis.com/fenado-ai-farm-public/generated/4c071633-54a0-44ad-9827-7c0987525968.webp" 
-              alt="Codex Solutions Logo" 
+            className="h-10 w-10 mr-2" 
+            src="https://storage.googleapis.com/fenado-ai-farm-public/generated/4c23c72b-eb21-4a66-92ac-92a701a6b7b1.webp" 
+            alt="CodeCraft Academy Logo" 
             />
             <span className="font-bold text-xl text-indigo-600 dark:text-indigo-400">
-              Codex Solutions
+            CodeCraft Academy
             </span>
           </div>
           
@@ -25,9 +25,9 @@ const Navbar = () => {
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-4">
               <a href="#home" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Home</a>
-              <a href="#services" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Services</a>
-              <a href="#about" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">About</a>
-              <a href="#work" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Our Work</a>
+              <a href="#courses" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Courses</a>
+              <a href="#features" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Features</a>
+              <a href="#instructors" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Instructors</a>
               <a href="#testimonials" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Testimonials</a>
               <a href="#contact" className="text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white px-3 py-2 rounded-md font-medium">Contact</a>
             </div>
@@ -36,7 +36,7 @@ const Navbar = () => {
           {/* CTA Button */}
           <div className="hidden md:block">
             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white">
-              Get a Quote
+              Start Learning
             </Button>
           </div>
           
@@ -74,13 +74,13 @@ const Navbar = () => {
         >
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 bg-white dark:bg-gray-900 shadow-lg">
             <a href="#home" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Home</a>
-            <a href="#services" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Services</a>
-            <a href="#about" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">About</a>
-            <a href="#work" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Our Work</a>
+            <a href="#courses" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Courses</a>
+            <a href="#features" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Features</a>
+            <a href="#instructors" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Instructors</a>
             <a href="#testimonials" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Testimonials</a>
             <a href="#contact" className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-white">Contact</a>
             <Button className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white">
-              Get a Quote
+              Start Learning
             </Button>
           </div>
         </motion.div>

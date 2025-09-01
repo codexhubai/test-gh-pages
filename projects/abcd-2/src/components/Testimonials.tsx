@@ -1,24 +1,31 @@
 import { motion } from 'framer-motion';
-import { QuoteIcon } from 'lucide-react';
+import { QuoteIcon, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Badge } from './ui/badge';
 
 const testimonials = [
   {
-    quote: "Codex Solutions transformed our business with a custom CRM system that perfectly addressed our unique needs. Their team was professional, responsive, and delivered ahead of schedule.",
+    quote: "The Web Development Bootcamp at CodeCraft Academy was transformative. I went from knowing basic HTML to building full-stack applications in just 12 weeks. The instructors were incredible and the hands-on projects gave me real-world experience that helped me land my first developer job.",
     author: "Sarah Johnson",
-    position: "COO, TechVision Inc.",
+    course: "Web Development Bootcamp",
+    position: "Frontend Developer at TechVision Inc.",
+    rating: 5,
     avatar: "https://storage.googleapis.com/fenado-ai-farm-public/generated/cdaae367-ec83-43fb-a957-5983d999622f.webp"
   },
   {
-    quote: "Working with Codex was a game-changer for our startup. Their mobile app development expertise helped us launch a product that users love and investors believe in.",
+    quote: "As someone with no prior programming experience, I was amazed at how quickly I progressed through the JavaScript course. The curriculum was perfectly structured and the community support was invaluable. Within a month after completing the course, I secured my first tech role.",
     author: "Michael Chen",
-    position: "Founder, HealthTrack",
+    course: "Advanced JavaScript",
+    position: "Junior Developer, HealthTrack",
+    rating: 5,
     avatar: "https://storage.googleapis.com/fenado-ai-farm-public/generated/081f0a76-e29e-45e2-a325-cdfa9424c60b.webp"
   },
   {
-    quote: "Their cloud migration service was flawless. We saw immediate improvements in performance and significant cost savings. I highly recommend Codex Solutions for any enterprise software needs.",
+    quote: "The React & Redux course completely changed my career trajectory. The instructors didn't just teach the technology—they showed us how to think like professional developers. Their mentorship and career guidance were just as valuable as the technical skills I gained.",
     author: "Elena Rodriguez",
-    position: "CTO, Global Logistics Ltd.",
+    course: "React & Redux Masterclass",
+    position: "Software Engineer, Global Tech",
+    rating: 5,
     avatar: "https://storage.googleapis.com/fenado-ai-farm-public/generated/78ef01ef-0f14-4ada-aafa-d400bcd0f096.webp"
   }
 ];
@@ -28,15 +35,17 @@ const Testimonials = () => {
     <section id="testimonials" className="py-16 md:py-24 bg-gray-50 dark:bg-gray-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-base text-indigo-600 dark:text-indigo-400 font-semibold tracking-wide uppercase">Testimonials</h2>
+          <Badge variant="outline" className="px-3 py-1 text-sm text-indigo-600 dark:text-indigo-400 border-indigo-600 dark:border-indigo-400">
+            Success Stories
+          </Badge>
           <motion.h3 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mt-2 text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white"
+            className="mt-3 text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white"
           >
-            What Our Clients Say
+            What Our Students Say
           </motion.h3>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -45,7 +54,7 @@ const Testimonials = () => {
             transition={{ delay: 0.2, duration: 0.6 }}
             className="mt-4 max-w-2xl text-xl text-gray-500 dark:text-gray-400 mx-auto"
           >
-            Don't just take our word for it. Hear from the businesses we've helped transform.
+            Hear from graduates who have transformed their careers through our coding courses
           </motion.p>
         </div>
         
@@ -64,6 +73,16 @@ const Testimonials = () => {
               </div>
               
               <div className="pt-8">
+                <div className="flex mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star 
+                      key={i}
+                      size={16} 
+                      className={`${i < testimonial.rating ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300'} mr-1`} 
+                    />
+                  ))}
+                </div>
+                
                 <p className="text-lg text-gray-600 dark:text-gray-300 italic relative z-10">
                   "{testimonial.quote}"
                 </p>
@@ -78,13 +97,32 @@ const Testimonials = () => {
                   
                   <div className="ml-4">
                     <p className="text-base font-medium text-gray-900 dark:text-white">{testimonial.author}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{testimonial.position}</p>
+                    <p className="text-sm text-indigo-600 dark:text-indigo-400">{testimonial.course}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{testimonial.position}</p>
                   </div>
                 </div>
               </div>
             </motion.div>
           ))}
         </div>
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.4, duration: 0.6 }}
+          className="text-center mt-12"
+        >
+          <a 
+            href="#contact" 
+            className="inline-flex items-center px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-300 font-medium"
+          >
+            Start Your Coding Journey
+            <svg className="ml-2 w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+            </svg>
+          </a>
+        </motion.div>
       </div>
     </section>
   );
