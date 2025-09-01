@@ -34,7 +34,7 @@ const Home = () => {
         
         {/* Subtitle */}
         <p className="text-sm text-gray-500 mt-8">
-          Built with CodexHub.ai website builder
+          Built with CodexHub.ai website's builder
         </p>
       </motion.div>
     </div>
