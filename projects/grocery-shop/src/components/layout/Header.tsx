@@ -30,7 +30,9 @@ const Header = () => {
             <Button variant="outline" size="sm">
               <ShoppingCart className="mr-2 h-4 w-4" /> Cart (0)
             </Button>
-            <Button size="sm">Sign In</Button>
+            <Button size="sm" asChild>
+              <a href="/login">Sign In</a>
+            </Button>
           </div>
 
           {/* Mobile Menu Button */}
@@ -55,7 +57,9 @@ const Header = () => {
                 <Button variant="outline" size="sm" className="justify-start">
                   <ShoppingCart className="mr-2 h-4 w-4" /> Cart (0)
                 </Button>
-                <Button size="sm">Sign In</Button>
+                <Button size="sm" asChild>
+                  <a href="/login">Sign In</a>
+                </Button>
               </div>
             </div>
           </nav>
