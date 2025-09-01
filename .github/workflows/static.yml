@@ -181,6 +181,10 @@ jobs:
         run: |
           set -euo pipefail
           
+          # Configure Git identity for tag creation
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          
           # Generate version tag based on timestamp and commit hash
           TIMESTAMP=$(date +"%Y%m%d-%H%M%S")
           COMMIT_HASH=$(git rev-parse --short HEAD)
