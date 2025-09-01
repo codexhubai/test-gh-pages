@@ -1,339 +1,46 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Badge } from "@/components/ui/badge";
-import { 
-  Send,
-  Bot,
-  User,
-  RefreshCw,
-  ExternalLink,
-  ArrowLeft,
-  AlertCircle,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Loader2
-} from "lucide-react";
 import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
-import { taskService, Task, TaskResponse } from "@/services/taskService";
 import { useApiKey } from "@/contexts/ApiKeyContext";
-import ApiKeyDialog from "@/components/ApiKeyDialog";
-
-interface Message {
-  id: string;
-  content: string;
-  sender: 'user' | 'bot';
-  timestamp: Date;
-  taskId?: string; // Track associated task ID
-}
-
-interface ActiveTask {
-  id: string;
-  task: string;
-  status: Task['status'];
-  createdAt: Date;
-  updatedAt: Date;
-  messageId?: string; // Associated message ID
-}
-
-// TaskCard component for inline display
-const TaskCard = ({ task, onRemove }: { task: ActiveTask; onRemove: (taskId: string) => void }) => {
-  const getStatusIcon = () => {
-    switch (task.status) {
-      case 'pending':
-        return <Clock className="w-3 h-3 text-yellow-500" />;
-      case 'in_progress':
-        return <Loader2 className="w-3 h-3 text-blue-500 animate-spin" />;
-      case 'completed':
-        return <CheckCircle className="w-3 h-3 text-green-500" />;
-      case 'failed':
-        return <XCircle className="w-3 h-3 text-red-500" />;
-      default:
-        return <Clock className="w-3 h-3 text-gray-500" />;
-    }
-  };
-
-  const getStatusColor = () => {
-    switch (task.status) {
-      case 'pending':
-        return 'bg-yellow-50 border-yellow-200';
-      case 'in_progress':
-        return 'bg-blue-50 border-blue-200';
-      case 'completed':
-        return 'bg-green-50 border-green-200';
-      case 'failed':
-        return 'bg-red-50 border-red-200';
-      default:
-        return 'bg-gray-50 border-gray-200';
-    }
-  };
-
-  const getStatusText = () => {
-    switch (task.status) {
-      case 'pending':
-        return 'Queued';
-      case 'in_progress':
-        return 'In Progress';
-      case 'completed':
-        return 'Completed';
-      case 'failed':
-        return 'Failed';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -10 }}
-      className="mb-2"
-    >
-      <div className={`p-2 border rounded-md ${getStatusColor()} w-full`}>
-        <div className="flex items-start gap-2">
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {getStatusIcon()}
-            <Badge variant="outline" className="text-xs px-1.5 py-0.5">
-              {getStatusText()}
-            </Badge>
-          </div>
-          <div className="flex-1 min-w-0">
-            <span className="text-xs text-gray-600 break-words leading-relaxed block">
-              {task.task}
-            </span>
-          </div>
-          {(task.status === 'completed' || task.status === 'failed') && (
-            <button
-              onClick={() => onRemove(task.id)}
-              className="h-4 w-4 p-0 opacity-50 hover:opacity-100 flex-shrink-0 text-xs leading-none flex items-center justify-center rounded-full hover:bg-gray-200"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
+import ChatHeader from "@/components/ChatHeader";
+import ChatInput from "@/components/ChatInput";
+import MessageComponent from "@/components/Message";
+import LoadingMessage from "@/components/LoadingMessage";
+import WebsitePreview from "@/components/WebsitePreview";
+import { useMessages } from "@/hooks/useMessages";
+import { useActiveTasks } from "@/hooks/useActiveTasks";
+import { useTaskPolling } from "@/hooks/useTaskPolling";
+import { ActiveTask } from "@/components/TaskCard";
+import { Message } from "@/components/Message";
 
 const ChatInterface = () => {
   const { projectName } = useParams<{ projectName: string }>();
   const navigate = useNavigate();
   const { apiKey, isApiKeySet } = useApiKey();
   
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const pollingAttemptsRef = useRef<number>(0);
-  const maxPollingAttempts = 20; // Maximum polling attempts before stopping
+  
+  // Custom hooks
+  const { messages, messagesEndRef, addMessage, updateMessage } = useMessages(projectName);
+  const { activeTasks, addTask, updateTask, removeTask } = useActiveTasks(projectName);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Memoize tasks that need polling to prevent unnecessary re-renders
-  const tasksToPoll = useMemo(() => {
-    return activeTasks.filter(task => 
-      task.status === 'pending' || task.status === 'in_progress'
-    );
-  }, [activeTasks]);
-
-  // Memoize the polling function to prevent recreation on every render
-  const pollTasks = useCallback(async () => {
-    // Get current active tasks that need polling
-    const currentActiveTasks = activeTasks.filter(task => 
-      task.status === 'pending' || task.status === 'in_progress'
-    );
-    
-    if (currentActiveTasks.length === 0 || !apiKey) {
-      // No active tasks to poll, clear interval
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      pollingAttemptsRef.current = 0;
-      return;
-    }
-
-    // Increment polling attempts
-    pollingAttemptsRef.current += 1;
-
-    // Stop polling if we've exceeded max attempts
-    if (pollingAttemptsRef.current > maxPollingAttempts) {
-      console.warn('Max polling attempts reached, stopping polling');
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-      return;
-    }
-
-    // Batch API calls for better performance
-    const taskPromises = currentActiveTasks.map(async (activeTask) => {
-      try {
-        const response = await taskService.getTaskById(activeTask.id, apiKey);
-        return { activeTask, response };
-      } catch (error) {
-        console.error('Error polling task:', error);
-        return { activeTask, response: null };
-      }
-    });
-
-    const results = await Promise.all(taskPromises);
-    
-    // Process results
-    for (const { activeTask, response } of results) {
-      if (response?.success) {
-        const task = response.task;
-        
-        // Update the task in our active tasks array
-        setActiveTasks(prev => prev.map(t => 
-          t.id === activeTask.id 
-            ? { ...t, status: task.status, updatedAt: new Date() }
-            : t
-        ));
-        
-        if (taskService.isTaskComplete(task.status)) {
-          // Update the bot message with the result
-          setMessages(prev => prev.map(msg => {
-            if (msg.taskId === activeTask.id) {
-              let resultMessage = "";
-              
-              if (task.status === 'completed') {
-               if (task.result?.task?.summary) {
-                  resultMessage = task.result.task.summary;
-                } else if (task.result?.message) {
-                  resultMessage = task.result.message;
-                } else {
-                  resultMessage = "Task completed successfully! Your changes have been applied.";
-                }
-              } else if (task.status === 'failed') {
-                resultMessage = "Task failed. Please try again or contact support if the issue persists.";
-              }
-              
-              return {
-                ...msg,
-                content: resultMessage
-              };
-            }
-            return msg;
-          }));
-          
-          // Refresh the iframe to show updated website
-          if (iframeRef.current) {
-            iframeRef.current.src = iframeRef.current.src;
-          }
-        }
-      } else if (response) {
-        console.error('Failed to fetch task status:', (response as any).message);
+  // Task polling hook
+  const { stopPolling } = useTaskPolling({
+    activeTasks,
+    apiKey,
+    onTaskUpdate: updateTask,
+    onMessageUpdate: updateMessage,
+    onIframeRefresh: () => {
+      if (iframeRef.current) {
+        iframeRef.current.src = iframeRef.current.src;
       }
     }
-  }, [activeTasks, apiKey, maxPollingAttempts]);
+  });
 
-  // Optimized task polling effect with fixed 30-second interval
-  useEffect(() => {
-    // Check if we have active tasks that need polling
-    const hasActiveTasks = activeTasks.some(task => 
-      task.status === 'pending' || task.status === 'in_progress'
-    );
-    
-    if (hasActiveTasks && apiKey) {
-      // Reset polling attempts when starting new polling
-      pollingAttemptsRef.current = 0;
-      
-      // Poll immediately, then every 30 seconds
-      pollTasks();
-      pollingIntervalRef.current = setInterval(pollTasks, 30000);
-    } else {
-      // No active tasks, clear any existing interval
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    }
-    
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [activeTasks, apiKey, pollTasks]);
 
-  // Initialize welcome message and check for existing tasks
-  useEffect(() => {
-    if (projectName && messages.length === 0) {
-      // Check for existing task in localStorage
-      const existingTaskData = localStorage.getItem(`codexhub_task_${projectName}`);
-      
-      if (existingTaskData) {
-        try {
-          const taskData = JSON.parse(existingTaskData);
-          const activeTask: ActiveTask = {
-            id: taskData.id,
-            task: taskData.task,
-            status: taskData.status,
-            createdAt: new Date(taskData.createdAt),
-            updatedAt: new Date(taskData.updatedAt)
-          };
-          
-          // Add the existing task to active tasks
-          setActiveTasks([activeTask]);
-          
-          // Add a message about the existing task
-          setMessages([
-            {
-              id: '1',
-              content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
-              sender: 'bot',
-              timestamp: new Date()
-            },
-            {
-              id: '2',
-              content: "I've started processing your request. This may take several minutes, grab a coffee (10 mins Approx)...",
-              sender: 'bot',
-              timestamp: new Date(taskData.createdAt),
-              taskId: taskData.id
-            }
-          ]);
-          
-          // Clean up the localStorage entry
-          localStorage.removeItem(`codexhub_task_${projectName}`);
-        } catch (error) {
-          console.error('Error parsing existing task data:', error);
-          // Fallback to normal welcome message
-          setMessages([{
-            id: '1',
-            content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
-            sender: 'bot',
-            timestamp: new Date()
-          }]);
-        }
-      } else {
-        // No existing task, show normal welcome message
-        setMessages([{
-          id: '1',
-          content: `Welcome to your ${projectName} project! I'm here to help you make changes to your website. What would you like to modify?`,
-          sender: 'bot',
-          timestamp: new Date()
-        }]);
-      }
-    }
-  }, [projectName, messages.length]);
 
   // Redirect to home if no project name
   useEffect(() => {
@@ -341,17 +48,6 @@ const ChatInterface = () => {
       navigate('/');
     }
   }, [projectName, navigate]);
-
-  // Cleanup effect to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      // Clear any pending intervals when component unmounts
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, []);
 
   const handleSendMessage = async () => {
     const hasActiveTasks = activeTasks.some(task => 
@@ -367,7 +63,7 @@ const ChatInterface = () => {
         sender: 'bot',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      addMessage(errorMessage);
       return;
     }
 
@@ -378,7 +74,7 @@ const ChatInterface = () => {
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    addMessage(userMessage);
     setInputMessage("");
     setIsLoading(true);
 
@@ -421,8 +117,8 @@ const ChatInterface = () => {
         };
 
         // Add both the task and message
-        setActiveTasks(prev => [...prev, newTask]);
-        setMessages(prev => [...prev, botMessage]);
+        addTask(newTask);
+        addMessage(botMessage);
       } else {
         // No task ID or failed response
         const botMessage: Message = {
@@ -432,7 +128,7 @@ const ChatInterface = () => {
           timestamp: new Date()
         };
 
-        setMessages(prev => [...prev, botMessage]);
+        addMessage(botMessage);
         setIsLoading(false);
       }
 
@@ -444,27 +140,10 @@ const ChatInterface = () => {
         sender: 'bot',
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      addMessage(errorMessage);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  const refreshWebsite = () => {
-    if (iframeRef.current) {
-      iframeRef.current.src = iframeRef.current.src;
-    }
-  };
-
-  const removeTask = (taskId: string) => {
-    setActiveTasks(prev => prev.filter(task => task.id !== taskId));
   };
 
   if (!projectName) {
@@ -482,46 +161,11 @@ const ChatInterface = () => {
     <div className="h-screen flex bg-gray-50">
       {/* Chat Interface - Left Side */}
       <div className="w-1/4 min-w-[320px] flex flex-col border-r border-gray-200">
-        {/* Header */}
-        <div className="p-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate('/')}
-                className="p-1"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </Button>
-              <div className="w-8 h-8 bg-gradient-to-r from-pink-500 via-purple-500 to-orange-500 rounded-lg flex items-center justify-center">
-                <span className="text-white text-sm font-bold">C</span>
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-gray-800">CodexHub Chat</h1>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-gray-500">Project: {projectName}</p>
-                  {!isApiKeySet && (
-                    <div className="flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3 text-amber-500" />
-                      <span className="text-xs text-amber-600">API Key Required</span>
-                    </div>
-                  )}
-                </div>
-                {activeTasks.length > 0 && (
-                  <div className="mt-1">
-                    <Badge variant="outline" className="text-xs">
-                      {activeTasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length} active task{activeTasks.filter(t => t.status === 'pending' || t.status === 'in_progress').length !== 1 ? 's' : ''}
-                    </Badge>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <ApiKeyDialog />
-            </div>
-          </div>
-        </div>
+        <ChatHeader 
+          projectName={projectName} 
+          isApiKeySet={isApiKeySet} 
+          activeTasks={activeTasks} 
+        />
 
         {/* Messages */}
         <ScrollArea className="flex-1 p-4">
@@ -531,147 +175,32 @@ const ChatInterface = () => {
               const associatedTask = message.taskId ? activeTasks.find(task => task.id === message.taskId) : null;
               
               return (
-                <div key={message.id}>
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    {message.sender === 'bot' && (
-                      <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-                        <Bot className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                    
-                    <Card className={`max-w-[85%] p-3 ${
-                      message.sender === 'user' 
-                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white' 
-                        : 'bg-white border-gray-200'
-                    }`}>
-                      <p className="text-sm break-words whitespace-pre-wrap leading-relaxed">{message.content}</p>
-                      <p className={`text-xs mt-2 ${
-                        message.sender === 'user' ? 'text-purple-100' : 'text-gray-400'
-                      }`}>
-                        {message.timestamp.toLocaleTimeString()}
-                      </p>
-                    </Card>
-
-                    {message.sender === 'user' && (
-                      <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                        <User className="w-4 h-4 text-gray-600" />
-                      </div>
-                    )}
-                  </motion.div>
-                  
-                  {/* Show task card inline after bot message if there's an associated task */}
-                  {message.sender === 'bot' && associatedTask && (
-                    <div className="ml-11 mt-3 w-[calc(100%-2.75rem)]">
-                      <TaskCard
-                        task={associatedTask}
-                        onRemove={removeTask}
-                      />
-                    </div>
-                  )}
-                </div>
+                <MessageComponent
+                  key={message.id}
+                  message={message}
+                  associatedTask={associatedTask}
+                  onRemoveTask={removeTask}
+                />
               );
             })}
             
-            {isLoading && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex gap-3 justify-start"
-              >
-                <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-                <Card className="bg-white border-gray-200 p-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                    <span className="text-sm text-gray-500 ml-2 break-words">Starting your request...</span>
-                  </div>
-                </Card>
-              </motion.div>
-            )}
-
-
+            {isLoading && <LoadingMessage />}
             
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 
-        {/* Input */}
-        <div className="p-4 border-t border-gray-200 bg-white">
-          {activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress') && (
-            <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-sm text-blue-700">
-                A task is currently running. Please wait for it to complete before sending another message.
-              </p>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <Textarea
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder={activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress') ? "Please wait for the current task to complete..." : "Describe the changes you want to make..."}
-              className="flex-1 min-h-[80px] resize-none"
-              disabled={isLoading || activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress')}
-              rows={3}
-            />
-            <Button
-              onClick={handleSendMessage}
-              disabled={!inputMessage.trim() || isLoading || activeTasks.some(task => task.status === 'pending' || task.status === 'in_progress')}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 self-end"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+        <ChatInput
+          inputMessage={inputMessage}
+          setInputMessage={setInputMessage}
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading}
+          activeTasks={activeTasks}
+        />
       </div>
 
       {/* Website Preview - Right Side */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Preview Header */}
-        <div className="p-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Website Preview</h2>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={refreshWebsite}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`/projects/${projectName}`, '_blank')}
-                className="flex items-center gap-2"
-              >
-                <ExternalLink className="w-4 h-4" />
-                Open in New Tab
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Iframe */}
-        <div className="flex-1 bg-white">
-          <iframe
-            ref={iframeRef}
-            src={`${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`}
-            className="w-full h-full border-0"
-            title={`${projectName} Preview`}
-            sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-          />
-        </div>
-      </div>
+      <WebsitePreview projectName={projectName} />
     </div>
   );
 };

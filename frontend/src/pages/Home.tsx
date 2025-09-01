@@ -27,10 +27,14 @@ const Home = () => {
         updatedAt: new Date().toISOString()
       };
       localStorage.setItem(`codexhub_task_${data.projectName}`, JSON.stringify(taskData));
+      console.log("Task data stored in localStorage:", taskData);
     }
     
-    // Navigate to chat interface
-    navigate(`/projects/${data.projectName}`);
+    // Small delay to ensure localStorage is set before navigation
+    setTimeout(() => {
+      // Navigate to chat interface
+      navigate(`/projects/${data.projectName}`);
+    }, 100);
   };
 
   return (
