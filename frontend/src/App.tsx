@@ -3,9 +3,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 
-// Context
-import { ApiKeyProvider } from "@/contexts/ApiKeyContext";
-
 // Pages
 import Home from "./pages/Home";
 import ChatInterface from "./pages/ChatInterface";
@@ -33,18 +30,16 @@ function getRouterBasename(): string {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ApiKeyProvider>
-      <TooltipProvider>
-        <Toaster />
-        <BrowserRouter basename={getRouterBasename()}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/projects/:projectName" element={<ChatInterface />} />
-            <Route path="*" element={<ErrorPage />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ApiKeyProvider>
+    <TooltipProvider>
+      <BrowserRouter basename={getRouterBasename()}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/projects/:projectName" element={<ChatInterface />} />
+          <Route path="*" element={<ErrorPage />} />
+        </Routes>
+      </BrowserRouter>
+      <Toaster />
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

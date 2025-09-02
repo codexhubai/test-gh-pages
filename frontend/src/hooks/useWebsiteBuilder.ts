@@ -5,17 +5,17 @@ import { useTaskPolling } from './useTaskPolling';
 import { ActiveTask } from '@/components/TaskCard';
 
 interface UseWebsiteBuilderProps {
-  apiKey: string | null;
   onSubmit?: (data: {
     message: string;
-    apiKey: string;
     projectName: string;
     taskId?: string;
     taskStatus?: string;
   }) => void;
 }
 
-export const useWebsiteBuilder = ({ apiKey, onSubmit }: UseWebsiteBuilderProps) => {
+export const useWebsiteBuilder = ({ onSubmit }: UseWebsiteBuilderProps) => {
+  // Get API key from environment variable
+  const apiKey = import.meta.env.VITE_CODEXHUB_API_KEY || '';
   const [message, setMessage] = useState("");
   const [projectName, setProjectName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -29,7 +29,6 @@ export const useWebsiteBuilder = ({ apiKey, onSubmit }: UseWebsiteBuilderProps) 
   // Task polling hook
   const { stopPolling } = useTaskPolling({
     activeTasks,
-    apiKey,
     onTaskUpdate: (taskId: string, status: string, result?: any) => {
       updateTask(taskId, status);
       
@@ -105,7 +104,7 @@ export const useWebsiteBuilder = ({ apiKey, onSubmit }: UseWebsiteBuilderProps) 
     setIsSubmitting(true);
     setTaskResult(null);
 
-    const repoUrl = `https://github.com/codexhubai/test-gh-pages.git`;
+    const repoUrl = import.meta.env.VITE_GITHUB_REPO_URL || '';
 
     try {
       // Prepare the request for the agent
@@ -122,7 +121,6 @@ export const useWebsiteBuilder = ({ apiKey, onSubmit }: UseWebsiteBuilderProps) 
 
       // Call the RunAgent method
       const response: RunAgentResponse = await agentService.runAgent(
-        apiKey,
         agentRequest
       );
 
@@ -145,7 +143,6 @@ export const useWebsiteBuilder = ({ apiKey, onSubmit }: UseWebsiteBuilderProps) 
         if (onSubmit) {
           await onSubmit({
             message: message.trim(),
-            apiKey: apiKey,
             projectName: projectName.trim(),
             taskId: taskId,
             taskStatus: 'pending',

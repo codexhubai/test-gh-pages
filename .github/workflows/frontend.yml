@@ -166,6 +166,7 @@ jobs:
         env:
           VITE_GITHUB_PAGES_URL: ${{ vars.VITE_GITHUB_PAGES_URL }}
           VITE_CODEXHUB_AGENT_URL: ${{ vars.VITE_CODEXHUB_AGENT_URL }}
+          VITE_CODEXHUB_API_KEY: ${{ secrets.VITE_CODEXHUB_API_KEY }}
       
       - name: Skip (no frontend changes)
         if: steps.frontend-changed.outputs.changed == 'false'

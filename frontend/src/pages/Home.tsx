@@ -9,15 +9,11 @@ const Home = () => {
 
   const handleFormSubmit = async (data: {
     message: string;
-    apiKey: string;
     projectName: string;
     taskId?: string;
     taskStatus?: string;
   }) => {
     console.log("Form submitted:", data);
-    
-    // Store API key in localStorage for the chat interface
-    localStorage.setItem('codexhub_api_key', data.apiKey);
     
     // Store task information in localStorage for the chat interface
     if (data.taskId) {
@@ -81,7 +77,7 @@ const Home = () => {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open('https://github.com/codexhubai/test-gh-pages/', '_blank')}
+                  onClick={() => window.open(import.meta.env.VITE_GITHUB_REPO_URL, '_blank')}
                   className="flex items-center gap-2 text-blue-700 border-blue-300 hover:bg-blue-50"
                 >
                   <ExternalLink className="w-4 h-4" />

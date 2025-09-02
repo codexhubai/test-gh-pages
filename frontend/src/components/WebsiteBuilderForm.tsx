@@ -6,21 +6,16 @@ import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { 
   Send,
-  Key,
   FolderOpen,
-  AlertCircle,
   CheckCircle,
   XCircle
 } from "lucide-react";
-import { useApiKey } from "@/contexts/ApiKeyContext";
-import ApiKeyDialog from "@/components/ApiKeyDialog";
 import TaskStatus from "@/components/TaskStatus";
 import { useWebsiteBuilder } from "@/hooks/useWebsiteBuilder";
 
 interface WebsiteBuilderFormProps {
   onSubmit?: (data: {
     message: string;
-    apiKey: string;
     projectName: string;
     taskId?: string;
     taskStatus?: string;
@@ -28,7 +23,6 @@ interface WebsiteBuilderFormProps {
 }
 
 const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
-  const { apiKey, isApiKeySet } = useApiKey();
   
   // Use the custom hook for form logic
   const {
@@ -43,7 +37,7 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
     canSubmit,
     handleSubmit,
     iframeRef
-  } = useWebsiteBuilder({ apiKey, onSubmit });
+  } = useWebsiteBuilder({ onSubmit });
 
 
 
@@ -109,58 +103,29 @@ const WebsiteBuilderForm = ({ onSubmit }: WebsiteBuilderFormProps) => {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* API Key Status and Project Name */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium text-gray-700">
-                  <Key className="w-4 h-4 inline mr-2" />
-                  CodexHub API Key
-                </Label>
-                <div className="h-12 flex items-center justify-between p-3 border-2 border-gray-200 rounded-md bg-gray-50">
-                  <div className="flex items-center gap-2">
-                    {isApiKeySet ? (
-                      <>
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-sm text-green-700 font-medium">API Key Set</span>
-                      </>
-                    ) : (
-                      <>
-                        <AlertCircle className="w-4 h-4 text-amber-500" />
-                        <span className="text-sm text-amber-700">API Key Required</span>
-                      </>
-                    )}
-                  </div>
-                  <ApiKeyDialog />
-                </div>
-                {!isApiKeySet && (
-                  <p className="text-xs text-amber-600 mt-1">
-                    Please set your API key to continue
-                  </p>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="projectName" className="text-sm font-medium text-gray-700">
-                  <FolderOpen className="w-4 h-4 inline mr-2" />
-                  Project Name
-                </Label>
-                <Input
-                  id="projectName"
-                  type="text"
-                  placeholder="e.g., my-awesome-project"
-                  value={projectName}
-                  onChange={handleProjectNameChange}
-                  disabled={activeTasks.length > 0}
-                  className={`h-12 border-2 transition-colors ${
-                    projectNameError 
-                      ? "border-red-500 focus:border-red-500" 
-                      : "border-gray-200 focus:border-purple-500"
-                  } ${activeTasks.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
-                  required
-                />
-                {projectNameError && (
-                  <p className="text-sm text-red-500 mt-1">{projectNameError}</p>
-                )}
-              </div>
+            {/* Project Name */}
+            <div className="space-y-2">
+              <Label htmlFor="projectName" className="text-sm font-medium text-gray-700">
+                <FolderOpen className="w-4 h-4 inline mr-2" />
+                Project Name
+              </Label>
+              <Input
+                id="projectName"
+                type="text"
+                placeholder="e.g., my-awesome-project"
+                value={projectName}
+                onChange={handleProjectNameChange}
+                disabled={activeTasks.length > 0}
+                className={`h-12 border-2 transition-colors ${
+                  projectNameError 
+                    ? "border-red-500 focus:border-red-500" 
+                    : "border-gray-200 focus:border-purple-500"
+                } ${activeTasks.length > 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                required
+              />
+              {projectNameError && (
+                <p className="text-sm text-red-500 mt-1">{projectNameError}</p>
+              )}
             </div>
 
             {/* Main Message Input */}

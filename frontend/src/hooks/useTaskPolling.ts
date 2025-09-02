@@ -4,7 +4,6 @@ import { ActiveTask } from '@/components/TaskCard';
 
 interface UseTaskPollingProps {
   activeTasks: ActiveTask[];
-  apiKey: string | null;
   onTaskUpdate: (taskId: string, status: string, result?: any) => void;
   onMessageUpdate: (taskId: string, content: string) => void;
   onIframeRefresh: () => void;
@@ -12,11 +11,11 @@ interface UseTaskPollingProps {
 
 export const useTaskPolling = ({
   activeTasks,
-  apiKey,
   onTaskUpdate,
   onMessageUpdate,
   onIframeRefresh
 }: UseTaskPollingProps) => {
+  
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingAttemptsRef = useRef<number>(0);
   const pollTasksRef = useRef<(() => Promise<void>) | null>(null);
@@ -39,7 +38,7 @@ export const useTaskPolling = ({
 
     console.log("Polling for tasks:", currentActiveTasks);
     
-    if (currentActiveTasks.length === 0 || !apiKey) {
+    if (currentActiveTasks.length === 0) {
       // No active tasks to poll, clear interval
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
@@ -65,7 +64,7 @@ export const useTaskPolling = ({
     // Batch API calls for better performance
     const taskPromises = currentActiveTasks.map(async (activeTask) => {
       try {
-        const response = await taskService.getTaskById(activeTask.id, apiKey);
+        const response = await taskService.getTaskById(activeTask.id);
         return { activeTask, response };
       } catch (error) {
         console.error('Error polling task:', error);
@@ -108,7 +107,7 @@ export const useTaskPolling = ({
         console.error('Failed to fetch task status:', (response as any).message);
       }
     }
-  }, [activeTasks, apiKey, onTaskUpdate, onMessageUpdate, onIframeRefresh]);
+  }, [activeTasks, onTaskUpdate, onMessageUpdate, onIframeRefresh]);
 
   // Store the latest pollTasks function in ref
   pollTasksRef.current = pollTasks;
@@ -118,7 +117,7 @@ export const useTaskPolling = ({
     // Check if we have active tasks that need polling
     const hasActiveTasks = pollingTasksKey.length > 0;
     
-    if (hasActiveTasks && apiKey && pollTasksRef.current) {
+    if (hasActiveTasks && pollTasksRef.current) {
       // Reset polling attempts when starting new polling
       pollingAttemptsRef.current = 0;
       
@@ -143,7 +142,7 @@ export const useTaskPolling = ({
         pollingIntervalRef.current = null;
       }
     };
-  }, [pollingTasksKey, apiKey]);
+  }, [pollingTasksKey]);
 
   // Cleanup on unmount
   useEffect(() => {

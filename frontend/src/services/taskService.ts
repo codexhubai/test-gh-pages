@@ -55,10 +55,19 @@ export class TaskService {
   /**
    * Fetch task status by task ID
    * @param taskId - The task ID to fetch
-   * @param apiKey - The API key for authentication
    * @returns Promise<TaskResponse | TaskError>
    */
-  async getTaskById(taskId: string, apiKey: string): Promise<TaskResponse | TaskError> {
+  async getTaskById(taskId: string): Promise<TaskResponse | TaskError> {
+    // Get API key from environment variable
+    const apiKey = import.meta.env.VITE_CODEXHUB_API_KEY || '';
+    
+    if (!apiKey) {
+      return {
+        success: false,
+        message: 'API key not configured. Please set VITE_CODEXHUB_API_KEY environment variable.',
+      };
+    }
+    
     const url = `${this.baseUrl}/tasks/${taskId}`;
     
     try {

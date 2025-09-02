@@ -1,17 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, AlertCircle } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import ApiKeyDialog from "./ApiKeyDialog";
 import { ActiveTask } from "./TaskCard";
 
 interface ChatHeaderProps {
   projectName: string;
-  isApiKeySet: boolean;
   activeTasks: ActiveTask[];
 }
 
-const ChatHeader = ({ projectName, isApiKeySet, activeTasks }: ChatHeaderProps) => {
+const ChatHeader = ({ projectName, activeTasks }: ChatHeaderProps) => {
   const navigate = useNavigate();
 
   return (
@@ -33,12 +31,6 @@ const ChatHeader = ({ projectName, isApiKeySet, activeTasks }: ChatHeaderProps) 
             <h1 className="text-lg font-semibold text-gray-800">CodexHub Chat</h1>
             <div className="flex items-center gap-2">
               <p className="text-sm text-gray-500">Project: {projectName}</p>
-              {!isApiKeySet && (
-                <div className="flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3 text-amber-500" />
-                  <span className="text-xs text-amber-600">API Key Required</span>
-                </div>
-              )}
             </div>
             {activeTasks.length > 0 && (
               <div className="mt-1">
@@ -48,9 +40,6 @@ const ChatHeader = ({ projectName, isApiKeySet, activeTasks }: ChatHeaderProps) 
               </div>
             )}
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <ApiKeyDialog />
         </div>
       </div>
     </div>

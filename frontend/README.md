@@ -117,10 +117,8 @@ Task Created → Pending → In Progress → Completed → Website Updated
 ```bash
 # API Configuration
 VITE_CODEXHUB_API_URL=https://api.codexhub.ai
-VITE_GITHUB_REPO_URL=https://github.com/codexhubai/test-gh-pages.git
+VITE_GITHUB_REPO_URL=https://github.com/codexhubai/website-builder-agent-example
 
-# Build Configuration
-VITE_BASE_URL=./  # For subfolder deployment
 ```
 
 ### Development Commands

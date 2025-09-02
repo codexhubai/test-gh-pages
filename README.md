@@ -13,7 +13,7 @@ This repository follows a **template-based architecture** where:
 ### Directory Structure
 
 ```
-test-gh-pages/
+website-builder-agent-example/
 ├── .github/workflows/static.yml    # GitHub Actions deployment workflow
 ├── template/                       # Base project template
 │   ├── src/

@@ -51,15 +51,17 @@ export class AgentService {
 
   /**
    * Run an agent by username and agent name
-   * @param username - The username of the agent owner
-   * @param agentName - The name of the agent
    * @param request - The request payload
    * @returns Promise<RunAgentResponse>
    */
-  async runAgent(
-    apiKey: string, 
-    request: RunAgentRequest
-  ): Promise<RunAgentResponse> {
+  async runAgent(request: RunAgentRequest): Promise<RunAgentResponse> {
+    // Get API key from environment variable
+    const apiKey = import.meta.env.VITE_CODEXHUB_API_KEY || '';
+    
+    if (!apiKey) {
+      throw new Error('VITE_CODEXHUB_API_KEY environment variable is not set');
+    }
+    
     const url = this.agentUrl;
     
     try {

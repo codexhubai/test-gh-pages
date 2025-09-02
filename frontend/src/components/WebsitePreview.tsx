@@ -51,7 +51,7 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`${import.meta.env.VITE_GITHUB_PAGES_URL}/projects/${projectName}`, '_blank')}
+              onClick={() => window.open(`${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`, '_blank')}
               className="flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
@@ -93,7 +93,7 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open('https://github.com/codexhubai/test-gh-pages/', '_blank')}
+                    onClick={() => window.open(import.meta.env.VITE_GITHUB_REPO_URL, '_blank')}
                     className="flex items-center gap-2 text-blue-700 border-blue-300 hover:bg-blue-50"
                   >
                     <ExternalLink className="w-4 h-4" />

@@ -1,23 +1,24 @@
-import { useState, useRef, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { agentService, RunAgentRequest, RunAgentResponse } from "@/services/agentService";
-import { useApiKey } from "@/contexts/ApiKeyContext";
+import { useActiveTasks } from "@/hooks/useActiveTasks";
+import { useTaskPolling } from "@/hooks/useTaskPolling";
+import { ActiveTask } from "@/components/TaskCard";
+import { Message } from "@/components/Message";
 import ChatHeader from "@/components/ChatHeader";
 import ChatInput from "@/components/ChatInput";
 import MessageComponent from "@/components/Message";
 import LoadingMessage from "@/components/LoadingMessage";
 import WebsitePreview from "@/components/WebsitePreview";
 import { useMessages } from "@/hooks/useMessages";
-import { useActiveTasks } from "@/hooks/useActiveTasks";
-import { useTaskPolling } from "@/hooks/useTaskPolling";
-import { ActiveTask } from "@/components/TaskCard";
-import { Message } from "@/components/Message";
 
 const ChatInterface = () => {
   const { projectName } = useParams<{ projectName: string }>();
   const navigate = useNavigate();
-  const { apiKey, isApiKeySet } = useApiKey();
+  
+  // Get API key from environment variable
+  const apiKey = import.meta.env.VITE_CODEXHUB_API_KEY || '';
   
   const [inputMessage, setInputMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -30,7 +31,6 @@ const ChatInterface = () => {
   // Task polling hook
   const { stopPolling } = useTaskPolling({
     activeTasks,
-    apiKey,
     onTaskUpdate: updateTask,
     onMessageUpdate: updateMessage,
     onIframeRefresh: () => {
@@ -56,10 +56,10 @@ const ChatInterface = () => {
     if (!inputMessage.trim() || isLoading || hasActiveTasks) return;
 
     // Check if API key is set
-    if (!isApiKeySet) {
+    if (!apiKey.trim()) {
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: "Please set your API key first to use the chat feature. Click the 'Set API Key' button in the header.",
+        content: "API key is not configured. Please set the VITE_CODEXHUB_API_KEY environment variable.",
         sender: 'bot',
         timestamp: new Date()
       };
@@ -79,7 +79,7 @@ const ChatInterface = () => {
     setIsLoading(true);
 
     try {
-      const repoUrl = `https://github.com/codexhubai/test-gh-pages.git`;
+      const repoUrl = import.meta.env.VITE_GITHUB_REPO_URL || '';
       
       const agentRequest: RunAgentRequest = {
         repoUrl: repoUrl,
@@ -93,7 +93,6 @@ const ChatInterface = () => {
       };
 
       const response: RunAgentResponse = await agentService.runAgent(
-        apiKey,
         agentRequest
       );
 
@@ -163,7 +162,6 @@ const ChatInterface = () => {
       <div className="w-1/4 min-w-[320px] flex flex-col border-r border-gray-200">
         <ChatHeader 
           projectName={projectName} 
-          isApiKeySet={isApiKeySet} 
           activeTasks={activeTasks} 
         />
 

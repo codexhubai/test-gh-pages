@@ -175,9 +175,9 @@ https://{username}.github.io/{repository-name}/{project-name}/
 ```
 
 **Examples**:
-- `https://username.github.io/test-gh-pages/myproject/`
-- `https://username.github.io/test-gh-pages/project-1/`
-- `https://username.github.io/test-gh-pages/project-2/`
+- `https://username.github.io/website-builder-agent-example/myproject/`
+- `https://username.github.io/website-builder-agent-example/project-1/`
+- `https://username.github.io/website-builder-agent-example/project-2/`
 
 ### Router Basename Detection
 

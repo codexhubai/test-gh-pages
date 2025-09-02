@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Message } from '@/components/Message';
-import { ActiveTask } from '@/components/TaskCard';
 
 export const useMessages = (projectName: string | undefined) => {
   const [messages, setMessages] = useState<Message[]>([]);
