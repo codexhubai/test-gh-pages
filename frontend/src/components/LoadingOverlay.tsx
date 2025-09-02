@@ -14,7 +14,7 @@ const LoadingOverlay = ({ isLoading, onRetry, isRefreshing }: LoadingOverlayProp
         {/* CodexHub Logo */}
         <div className="mb-8">
           <img 
-            src="/logo.png" 
+            src="/website-builder-agent-example/app/logo.png" 
             alt="CodexHub Logo" 
             className="w-24 h-24 mx-auto object-contain"
           />
