@@ -198,7 +198,7 @@ const ChatInterface = () => {
       </div>
 
       {/* Website Preview - Right Side */}
-      <WebsitePreview projectName={projectName} />
+      <WebsitePreview projectName={projectName} activeTasks={activeTasks} />
     </div>
   );
 };

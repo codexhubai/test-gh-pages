@@ -9,20 +9,42 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import LoadingOverlay from "./LoadingOverlay";
+import TaskCompletionDialog from "./TaskCompletionDialog";
 
 interface WebsitePreviewProps {
   projectName: string;
+  activeTasks?: Array<{
+    id: string;
+    status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  }>;
 }
 
-const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
+const WebsitePreview = ({ projectName, activeTasks = [] }: WebsitePreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const completedTasksRef = useRef<Set<string>>(new Set());
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
+  const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isWebsiteReady, setIsWebsiteReady] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [cacheBuster, setCacheBuster] = useState(Date.now());
 
   const websiteUrl = `${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`;
+
+  // Reset completed tasks when project changes
+  useEffect(() => {
+    completedTasksRef.current.clear();
+  }, [projectName]);
+
+  // Detect when a task completes and show completion dialog
+  useEffect(() => {
+    activeTasks.forEach(task => {
+      if (task.status === 'completed' && !completedTasksRef.current.has(task.id)) {
+        completedTasksRef.current.add(task.id);
+        setIsCompletionDialogOpen(true);
+      }
+    });
+  }, [activeTasks]);
 
   useEffect(() => {
     const checkWebsiteStatus = async () => {
@@ -229,6 +251,14 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
           </DialogHeader>
         </DialogContent>
       </Dialog>
+
+      {/* Task Completion Dialog */}
+      <TaskCompletionDialog
+        isOpen={isCompletionDialogOpen}
+        onClose={() => setIsCompletionDialogOpen(false)}
+        onRefresh={refreshWebsite}
+        projectName={projectName}
+      />
     </div>
   );
 };
