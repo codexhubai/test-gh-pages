@@ -19,6 +19,8 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isWebsiteReady, setIsWebsiteReady] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [cacheBuster, setCacheBuster] = useState(Date.now());
 
   const websiteUrl = `${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`;
 
@@ -42,12 +44,47 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
     };
 
     checkWebsiteStatus();
-  }, [websiteUrl]);
+  }, [websiteUrl, cacheBuster]);
 
   const refreshWebsite = () => {
+    // Prevent multiple simultaneous refresh operations
+    if (isRefreshing) return;
+    
+    // Update cache buster to force fresh content
+    const newCacheBuster = Date.now();
+    setCacheBuster(newCacheBuster);
+    
+    // Set loading state to show overlay during refresh
+    setIsRefreshing(true);
+    setIsLoading(true);
+    setIsWebsiteReady(false);
+    
+    // Refresh the iframe with new cache buster
     if (iframeRef.current) {
-      iframeRef.current.src = iframeRef.current.src;
+      iframeRef.current.src = `${websiteUrl}?cacheBuster=${newCacheBuster}`;
     }
+    
+    // Check website availability after a short delay to allow iframe to load
+    setTimeout(() => {
+      const checkWebsiteStatus = async () => {
+        try {
+          const response = await fetch(websiteUrl, { method: 'HEAD' });
+          
+          if (response.ok) {
+            setIsWebsiteReady(true);
+          } else {
+            setIsWebsiteReady(false);
+          }
+        } catch (error) {
+          console.error('Error checking website status:', error);
+          setIsWebsiteReady(false);
+        } finally {
+          setIsLoading(false);
+          setIsRefreshing(false);
+        }
+      };
+      checkWebsiteStatus();
+    }, 1000); // 1 second delay to allow iframe to start loading
   };
 
   const retryWebsiteCheck = () => {
@@ -93,10 +130,11 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
               variant="outline"
               size="sm"
               onClick={refreshWebsite}
+              disabled={isRefreshing}
               className="flex items-center gap-2"
             >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
             <Button
               variant="outline"
@@ -117,16 +155,44 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
           <LoadingOverlay 
             isLoading={isLoading} 
             onRetry={retryWebsiteCheck}
+            isRefreshing={isRefreshing}
           />
         )}
         
         <iframe
           ref={iframeRef}
-          src={websiteUrl}
+          src={`${websiteUrl}?cacheBuster=${cacheBuster}`}
           className="w-full h-full border-0"
           title={`${projectName} Preview`}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
           style={{ opacity: isWebsiteReady ? 1 : 0 }}
+          onLoad={() => {
+            // When iframe loads, check if the website is actually accessible
+            const checkIframeStatus = async () => {
+              try {
+                const response = await fetch(websiteUrl, { method: 'HEAD' });
+                if (response.ok) {
+                  setIsWebsiteReady(true);
+                } else {
+                  setIsWebsiteReady(false);
+                }
+              } catch (error) {
+                console.error('Error checking iframe status:', error);
+                setIsWebsiteReady(false);
+              } finally {
+                setIsLoading(false);
+                setIsRefreshing(false);
+              }
+            };
+            checkIframeStatus();
+          }}
+          onError={() => {
+            // Handle iframe loading errors
+            console.error('Iframe failed to load');
+            setIsWebsiteReady(false);
+            setIsLoading(false);
+            setIsRefreshing(false);
+          }}
         />
       </div>
 

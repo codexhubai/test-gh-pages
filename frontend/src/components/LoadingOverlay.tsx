@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 interface LoadingOverlayProps {
   isLoading: boolean;
   onRetry?: () => void;
+  isRefreshing?: boolean;
 }
 
-const LoadingOverlay = ({ isLoading, onRetry }: LoadingOverlayProps) => {
+const LoadingOverlay = ({ isLoading, onRetry, isRefreshing }: LoadingOverlayProps) => {
   return (
     <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center z-10">
       <div className="text-center space-y-6 p-8">
@@ -21,11 +22,13 @@ const LoadingOverlay = ({ isLoading, onRetry }: LoadingOverlayProps) => {
         
         {/* Main Message */}
         <h1 className="text-4xl font-bold text-gray-800 mb-4">
-          {isLoading ? "Please wait" : "CodexHub is loading"}
+          {isRefreshing ? "Refreshing..." : isLoading ? "Please wait" : "CodexHub is loading"}
         </h1>
         
         <p className="text-xl text-gray-600 max-w-md mx-auto leading-relaxed">
-          {isLoading 
+          {isRefreshing 
+            ? "Refreshing your website preview..." 
+            : isLoading 
             ? "Checking website availability..." 
             : "Your website will appear here once deployment is complete"
           }
