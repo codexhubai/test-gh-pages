@@ -21,7 +21,7 @@ const Home = () => {
               delay: 0.3
             }}
           >
-            Hello World
+            Bye World
           </motion.h1>
         </section>
         
