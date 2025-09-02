@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, ExternalLink, Info, X } from "lucide-react";
 import {
@@ -8,6 +8,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import LoadingOverlay from "./LoadingOverlay";
 
 interface WebsitePreviewProps {
   projectName: string;
@@ -16,11 +17,60 @@ interface WebsitePreviewProps {
 const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isInfoDialogOpen, setIsInfoDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isWebsiteReady, setIsWebsiteReady] = useState(false);
+
+  const websiteUrl = `${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`;
+
+  useEffect(() => {
+    const checkWebsiteStatus = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(websiteUrl, { method: 'HEAD' });
+        
+        if (response.ok) {
+          setIsWebsiteReady(true);
+        } else {
+          setIsWebsiteReady(false);
+        }
+      } catch (error) {
+        console.error('Error checking website status:', error);
+        setIsWebsiteReady(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkWebsiteStatus();
+  }, [websiteUrl]);
 
   const refreshWebsite = () => {
     if (iframeRef.current) {
       iframeRef.current.src = iframeRef.current.src;
     }
+  };
+
+  const retryWebsiteCheck = () => {
+    setIsLoading(true);
+    setIsWebsiteReady(false);
+    // Re-trigger the useEffect by updating the dependency
+    const checkWebsiteStatus = async () => {
+      try {
+        const response = await fetch(websiteUrl, { method: 'HEAD' });
+        
+        if (response.ok) {
+          setIsWebsiteReady(true);
+        } else {
+          setIsWebsiteReady(false);
+        }
+      } catch (error) {
+        console.error('Error checking website status:', error);
+        setIsWebsiteReady(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    checkWebsiteStatus();
   };
 
   return (
@@ -51,7 +101,7 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.open(`${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`, '_blank')}
+              onClick={() => window.open(websiteUrl, '_blank')}
               className="flex items-center gap-2"
             >
               <ExternalLink className="w-4 h-4" />
@@ -61,14 +111,22 @@ const WebsitePreview = ({ projectName }: WebsitePreviewProps) => {
         </div>
       </div>
 
-      {/* Iframe */}
-      <div className="flex-1 bg-white">
+      {/* Iframe Container with Loading Overlay */}
+      <div className="flex-1 bg-white relative">
+        {(!isWebsiteReady || isLoading) && (
+          <LoadingOverlay 
+            isLoading={isLoading} 
+            onRetry={retryWebsiteCheck}
+          />
+        )}
+        
         <iframe
           ref={iframeRef}
-          src={`${import.meta.env.VITE_GITHUB_PAGES_URL}/${projectName}`}
+          src={websiteUrl}
           className="w-full h-full border-0"
           title={`${projectName} Preview`}
           sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+          style={{ opacity: isWebsiteReady ? 1 : 0 }}
         />
       </div>
 
