@@ -157,10 +157,10 @@ jobs:
           (cd frontend && bun install --silent && bun run build)
           
           # Create app directory and copy frontend build there
-          mkdir -p dist/app
-          cp -R frontend/dist/. dist/app/
+          mkdir -p dist/
+          cp -R frontend/dist/. dist/
           
-          echo "Added/updated frontend to dist/app directory"
+          echo "Added/updated frontend to dist/ directory"
           echo "Final dist directory contents:"
           ls -la dist
         env:
